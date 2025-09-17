@@ -346,6 +346,218 @@ export class GodotServer {
             required: ['projectPath'],
           },
         },
+        {
+          name: 'create_tilemap',
+          description: 'Create a TileMap node in an existing scene',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Path to the scene file (relative to project)',
+              },
+              tilemapName: {
+                type: 'string',
+                description: 'Name for the new TileMap node',
+              },
+              parentNodePath: {
+                type: 'string',
+                description: 'Path to the parent node (e.g., "root" or "root/GameWorld")',
+                default: 'root',
+              },
+              properties: {
+                type: 'object',
+                description: 'Optional properties to set on the TileMap node',
+              },
+            },
+            required: ['projectPath', 'scenePath', 'tilemapName'],
+          },
+        },
+        {
+          name: 'create_tileset',
+          description: 'Create a new TileSet resource',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              tilesetPath: {
+                type: 'string',
+                description: 'Path where the TileSet resource will be saved (relative to project)',
+              },
+            },
+            required: ['projectPath', 'tilesetPath'],
+          },
+        },
+        {
+          name: 'set_tilemap_source',
+          description: 'Set the TileSet resource for a TileMap node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Path to the scene file (relative to project)',
+              },
+              tilemapPath: {
+                type: 'string',
+                description: 'Path to the TileMap node (e.g., "root/TileMap")',
+              },
+              tilesetPath: {
+                type: 'string',
+                description: 'Path to the TileSet resource (relative to project)',
+              },
+            },
+            required: ['projectPath', 'scenePath', 'tilemapPath', 'tilesetPath'],
+          },
+        },
+        {
+          name: 'paint_tiles',
+          description: 'Paint tiles on a TileMap',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Path to the scene file (relative to project)',
+              },
+              tilemapPath: {
+                type: 'string',
+                description: 'Path to the TileMap node (e.g., "root/TileMap")',
+              },
+              tiles: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    x: {
+                      type: 'integer',
+                      description: 'X coordinate of the tile',
+                    },
+                    y: {
+                      type: 'integer',
+                      description: 'Y coordinate of the tile',
+                    },
+                    sourceId: {
+                      type: 'integer',
+                      description: 'Source ID from the TileSet',
+                    },
+                    atlasX: {
+                      type: 'integer',
+                      description: 'X coordinate in the atlas (optional, default 0)',
+                    },
+                    atlasY: {
+                      type: 'integer',
+                      description: 'Y coordinate in the atlas (optional, default 0)',
+                    },
+                    alternativeTile: {
+                      type: 'integer',
+                      description: 'Alternative tile ID (optional, default 0)',
+                    },
+                  },
+                  required: ['x', 'y', 'sourceId'],
+                },
+                description: 'Array of tile data to paint',
+              },
+              layer: {
+                type: 'integer',
+                description: 'TileMap layer to paint on (default 0)',
+                default: 0,
+              },
+            },
+            required: ['projectPath', 'scenePath', 'tilemapPath', 'tiles'],
+          },
+        },
+        {
+          name: 'add_tileset_source',
+          description: 'Add a texture source to an existing TileSet',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              tilesetPath: {
+                type: 'string',
+                description: 'Path to the TileSet resource (relative to project)',
+              },
+              texturePath: {
+                type: 'string',
+                description: 'Path to the texture file (relative to project)',
+              },
+              sourceId: {
+                type: 'integer',
+                description: 'Source ID to assign (optional, auto-assigned if not provided)',
+              },
+              textureRegionSize: {
+                type: 'object',
+                properties: {
+                  x: {
+                    type: 'integer',
+                    description: 'Width of each tile in pixels',
+                  },
+                  y: {
+                    type: 'integer',
+                    description: 'Height of each tile in pixels',
+                  },
+                },
+                required: ['x', 'y'],
+                description: 'Size of each tile region in the texture',
+              },
+              margins: {
+                type: 'object',
+                properties: {
+                  x: {
+                    type: 'integer',
+                    description: 'Left/right margin in pixels',
+                  },
+                  y: {
+                    type: 'integer',
+                    description: 'Top/bottom margin in pixels',
+                  },
+                },
+                required: ['x', 'y'],
+                description: 'Margins around the tile atlas',
+              },
+              separation: {
+                type: 'object',
+                properties: {
+                  x: {
+                    type: 'integer',
+                    description: 'Horizontal separation between tiles in pixels',
+                  },
+                  y: {
+                    type: 'integer',
+                    description: 'Vertical separation between tiles in pixels',
+                  },
+                },
+                required: ['x', 'y'],
+                description: 'Separation between tiles in the atlas',
+              },
+              autoCreateTiles: {
+                type: 'boolean',
+                description: 'Automatically create tiles based on texture dimensions',
+                default: false,
+              },
+            },
+            required: ['projectPath', 'tilesetPath', 'texturePath'],
+          },
+        },
       ],
     }));
 
@@ -384,6 +596,16 @@ export class GodotServer {
           return await this.toolHandlers.handleGetUid(request.params.arguments);
         case 'update_project_uids':
           return await this.toolHandlers.handleUpdateProjectUids(request.params.arguments);
+        case 'create_tilemap':
+          return await this.toolHandlers.handleCreateTilemap(request.params.arguments);
+        case 'create_tileset':
+          return await this.toolHandlers.handleCreateTileset(request.params.arguments);
+        case 'set_tilemap_source':
+          return await this.toolHandlers.handleSetTilemapSource(request.params.arguments);
+        case 'paint_tiles':
+          return await this.toolHandlers.handlePaintTiles(request.params.arguments);
+        case 'add_tileset_source':
+          return await this.toolHandlers.handleAddTilesetSource(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

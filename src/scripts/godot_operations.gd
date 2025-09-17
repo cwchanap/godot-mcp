@@ -71,6 +71,16 @@ func _init():
             get_uid(params)
         "resave_resources":
             resave_resources(params)
+        "create_tilemap":
+            create_tilemap(params)
+        "create_tileset":
+            create_tileset(params)
+        "set_tilemap_source":
+            set_tilemap_source(params)
+        "paint_tiles":
+            paint_tiles(params)
+        "add_tileset_source":
+            add_tileset_source(params)
         _:
             log_error("Unknown operation: " + operation)
             quit(1)
@@ -1091,6 +1101,417 @@ func resave_resources(params):
         print("- Scripts/shaders missing UIDs: " + str(missing_uids))
         print("- UIDs successfully generated: " + str(generated_uids))
     print("Resave operation complete")
+
+# Create a TileMap node in an existing scene
+func create_tilemap(params):
+    print("Creating TileMap in scene: " + params.scene_path)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+    if debug_mode:
+        print("Scene path (with res://): " + full_scene_path)
+
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    var scene = load(full_scene_path)
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+    if debug_mode:
+        print("Scene instantiated")
+
+    # Get parent node path
+    var parent_path = "root"  # Default value
+    if params.has("parent_node_path"):
+        parent_path = params.parent_node_path
+    if debug_mode:
+        print("Parent path: " + parent_path)
+
+    var parent = scene_root
+    if parent_path != "root":
+        parent = scene_root.get_node(parent_path.replace("root/", ""))
+        if not parent:
+            printerr("Parent node not found: " + parent_path)
+            quit(1)
+
+    # Create TileMap node
+    var tilemap = TileMap.new()
+    tilemap.name = params.tilemap_name
+    if debug_mode:
+        print("TileMap created with name: " + tilemap.name)
+
+    # Set optional properties
+    if params.has("properties"):
+        var properties = params.properties
+        for property in properties:
+            if debug_mode:
+                print("Setting property: " + property + " = " + str(properties[property]))
+            tilemap.set(property, properties[property])
+
+    # Add to parent and set ownership
+    parent.add_child(tilemap)
+    tilemap.owner = scene_root
+    if debug_mode:
+        print("TileMap added to parent and ownership set")
+
+    # Save the scene
+    var packed_scene = PackedScene.new()
+    var result = packed_scene.pack(scene_root)
+    if debug_mode:
+        print("Pack result: " + str(result) + " (OK=" + str(OK) + ")")
+
+    if result == OK:
+        var save_error = ResourceSaver.save(packed_scene, full_scene_path)
+        if debug_mode:
+            print("Save result: " + str(save_error) + " (OK=" + str(OK) + ")")
+        if save_error == OK:
+            print("TileMap '" + params.tilemap_name + "' created successfully")
+        else:
+            printerr("Failed to save scene: " + str(save_error))
+    else:
+        printerr("Failed to pack scene: " + str(result))
+
+# Create a new TileSet resource
+func create_tileset(params):
+    print("Creating TileSet resource: " + params.tileset_path)
+
+    var full_tileset_path = params.tileset_path
+    if not full_tileset_path.begins_with("res://"):
+        full_tileset_path = "res://" + full_tileset_path
+    if debug_mode:
+        print("TileSet path (with res://): " + full_tileset_path)
+
+    # Create new TileSet
+    var tileset = TileSet.new()
+    if debug_mode:
+        print("TileSet created")
+
+    # Create directory if it doesn't exist
+    var dir = DirAccess.open("res://")
+    if dir == null:
+        printerr("Failed to open res:// directory")
+        printerr("DirAccess error: " + str(DirAccess.get_open_error()))
+        quit(1)
+
+    var tileset_dir = full_tileset_path.get_base_dir()
+    if debug_mode:
+        print("TileSet directory: " + tileset_dir)
+
+    if tileset_dir != "res://" and not dir.dir_exists(tileset_dir.substr(6)):  # Remove "res://" prefix
+        if debug_mode:
+            print("Creating directory: " + tileset_dir)
+        var error = dir.make_dir_recursive(tileset_dir.substr(6))  # Remove "res://" prefix
+        if error != OK:
+            printerr("Failed to create directory: " + tileset_dir + ", error: " + str(error))
+            quit(1)
+
+    # Save the TileSet
+    var save_error = ResourceSaver.save(tileset, full_tileset_path)
+    if debug_mode:
+        print("Save result: " + str(save_error) + " (OK=" + str(OK) + ")")
+
+    if save_error == OK:
+        print("TileSet created successfully at: " + full_tileset_path)
+    else:
+        printerr("Failed to save TileSet: " + str(save_error))
+
+# Set the TileSet resource for a TileMap node
+func set_tilemap_source(params):
+    print("Setting TileSet for TileMap in scene: " + params.scene_path)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+
+    var full_tileset_path = params.tileset_path
+    if not full_tileset_path.begins_with("res://"):
+        full_tileset_path = "res://" + full_tileset_path
+
+    if debug_mode:
+        print("Scene path (with res://): " + full_scene_path)
+        print("TileSet path (with res://): " + full_tileset_path)
+
+    # Check if files exist
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    if not FileAccess.file_exists(full_tileset_path):
+        printerr("TileSet file does not exist at: " + full_tileset_path)
+        quit(1)
+
+    # Load scene and TileSet
+    var scene = load(full_scene_path)
+    var tileset = load(full_tileset_path)
+
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    if not tileset:
+        printerr("Failed to load TileSet: " + full_tileset_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+    if debug_mode:
+        print("Scene and TileSet loaded successfully")
+
+    # Find the TileMap node
+    var tilemap_path = params.tilemap_path
+    if debug_mode:
+        print("Original TileMap path: " + tilemap_path)
+
+    if tilemap_path.begins_with("root/"):
+        tilemap_path = tilemap_path.substr(5)  # Remove "root/" prefix
+        if debug_mode:
+            print("TileMap path after removing 'root/' prefix: " + tilemap_path)
+
+    var tilemap_node = null
+    if tilemap_path == "":
+        # If no path, assume root is the TileMap
+        tilemap_node = scene_root
+        if debug_mode:
+            print("Using root node as TileMap node")
+    else:
+        tilemap_node = scene_root.get_node(tilemap_path)
+        if tilemap_node and debug_mode:
+            print("Found TileMap node: " + tilemap_node.name)
+
+    if not tilemap_node:
+        printerr("TileMap node not found: " + params.tilemap_path)
+        quit(1)
+
+    # Check if the node is a TileMap
+    if debug_mode:
+        print("Node class: " + tilemap_node.get_class())
+    if not tilemap_node is TileMap:
+        printerr("Node is not a TileMap: " + tilemap_node.get_class())
+        quit(1)
+
+    # Set the TileSet
+    tilemap_node.tile_set = tileset
+    if debug_mode:
+        print("TileSet assigned to TileMap")
+
+    # Save the scene
+    var packed_scene = PackedScene.new()
+    var result = packed_scene.pack(scene_root)
+    if debug_mode:
+        print("Pack result: " + str(result) + " (OK=" + str(OK) + ")")
+
+    if result == OK:
+        var save_error = ResourceSaver.save(packed_scene, full_scene_path)
+        if debug_mode:
+            print("Save result: " + str(save_error) + " (OK=" + str(OK) + ")")
+        if save_error == OK:
+            print("TileSet assigned to TileMap successfully")
+        else:
+            printerr("Failed to save scene: " + str(save_error))
+    else:
+        printerr("Failed to pack scene: " + str(result))
+
+# Paint tiles on a TileMap
+func paint_tiles(params):
+    print("Painting tiles on TileMap in scene: " + params.scene_path)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+
+    if debug_mode:
+        print("Scene path (with res://): " + full_scene_path)
+
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    var scene = load(full_scene_path)
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+    if debug_mode:
+        print("Scene loaded successfully")
+
+    # Find the TileMap node
+    var tilemap_path = params.tilemap_path
+    if debug_mode:
+        print("Original TileMap path: " + tilemap_path)
+
+    if tilemap_path.begins_with("root/"):
+        tilemap_path = tilemap_path.substr(5)  # Remove "root/" prefix
+        if debug_mode:
+            print("TileMap path after removing 'root/' prefix: " + tilemap_path)
+
+    var tilemap_node = null
+    if tilemap_path == "":
+        tilemap_node = scene_root
+        if debug_mode:
+            print("Using root node as TileMap node")
+    else:
+        tilemap_node = scene_root.get_node(tilemap_path)
+        if tilemap_node and debug_mode:
+            print("Found TileMap node: " + tilemap_node.name)
+
+    if not tilemap_node:
+        printerr("TileMap node not found: " + params.tilemap_path)
+        quit(1)
+
+    if not tilemap_node is TileMap:
+        printerr("Node is not a TileMap: " + tilemap_node.get_class())
+        quit(1)
+
+    # Get tile painting parameters
+    var tiles = params.tiles  # Array of tile data
+    var layer = params.layer if params.has("layer") else 0
+
+    if debug_mode:
+        print("Painting " + str(tiles.size()) + " tiles on layer " + str(layer))
+
+    # Paint each tile
+    for tile_data in tiles:
+        var x = tile_data.x
+        var y = tile_data.y
+        var source_id = tile_data.source_id
+        var atlas_coords = Vector2i(tile_data.atlas_x, tile_data.atlas_y) if tile_data.has("atlas_x") and tile_data.has("atlas_y") else Vector2i(0, 0)
+        var alternative_tile = tile_data.alternative_tile if tile_data.has("alternative_tile") else 0
+
+        if debug_mode:
+            print("Painting tile at (" + str(x) + ", " + str(y) + ") with source_id=" + str(source_id) + ", atlas_coords=" + str(atlas_coords) + ", alternative=" + str(alternative_tile))
+
+        tilemap_node.set_cell(layer, Vector2i(x, y), source_id, atlas_coords, alternative_tile)
+
+    if debug_mode:
+        print("All tiles painted successfully")
+
+    # Save the scene
+    var packed_scene = PackedScene.new()
+    var result = packed_scene.pack(scene_root)
+    if debug_mode:
+        print("Pack result: " + str(result) + " (OK=" + str(OK) + ")")
+
+    if result == OK:
+        var save_error = ResourceSaver.save(packed_scene, full_scene_path)
+        if debug_mode:
+            print("Save result: " + str(save_error) + " (OK=" + str(OK) + ")")
+        if save_error == OK:
+            print("Tiles painted successfully on TileMap")
+        else:
+            printerr("Failed to save scene: " + str(save_error))
+    else:
+        printerr("Failed to pack scene: " + str(result))
+
+# Add a texture source to an existing TileSet
+func add_tileset_source(params):
+    print("Adding texture source to TileSet: " + params.tileset_path)
+
+    var full_tileset_path = params.tileset_path
+    if not full_tileset_path.begins_with("res://"):
+        full_tileset_path = "res://" + full_tileset_path
+
+    var full_texture_path = params.texture_path
+    if not full_texture_path.begins_with("res://"):
+        full_texture_path = "res://" + full_texture_path
+
+    if debug_mode:
+        print("TileSet path (with res://): " + full_tileset_path)
+        print("Texture path (with res://): " + full_texture_path)
+
+    # Check if files exist
+    if not FileAccess.file_exists(full_tileset_path):
+        printerr("TileSet file does not exist at: " + full_tileset_path)
+        quit(1)
+
+    if not FileAccess.file_exists(full_texture_path):
+        printerr("Texture file does not exist at: " + full_texture_path)
+        quit(1)
+
+    # Load TileSet and texture
+    var tileset = load(full_tileset_path)
+    var texture = load(full_texture_path)
+
+    if not tileset:
+        printerr("Failed to load TileSet: " + full_tileset_path)
+        quit(1)
+
+    if not texture:
+        printerr("Failed to load texture: " + full_texture_path)
+        quit(1)
+
+    if debug_mode:
+        print("TileSet and texture loaded successfully")
+
+    # Create TileSetAtlasSource
+    var atlas_source = TileSetAtlasSource.new()
+    atlas_source.texture = texture
+
+    # Set texture region size (optional parameters)
+    if params.has("texture_region_size"):
+        var size_data = params.texture_region_size
+        var region_size = Vector2i(size_data.x, size_data.y)
+        atlas_source.texture_region_size = region_size
+        if debug_mode:
+            print("Set texture region size: " + str(region_size))
+
+    # Set margins (optional)
+    if params.has("margins"):
+        var margin_data = params.margins
+        var margins = Vector2i(margin_data.x, margin_data.y)
+        atlas_source.margins = margins
+        if debug_mode:
+            print("Set margins: " + str(margins))
+
+    # Set separation (optional)
+    if params.has("separation"):
+        var sep_data = params.separation
+        var separation = Vector2i(sep_data.x, sep_data.y)
+        atlas_source.separation = separation
+        if debug_mode:
+            print("Set separation: " + str(separation))
+
+    # Determine source ID
+    var source_id = params.source_id if params.has("source_id") else tileset.get_next_source_id()
+
+    # Add the source to the TileSet
+    tileset.add_source(atlas_source, source_id)
+    if debug_mode:
+        print("Atlas source added with ID: " + str(source_id))
+
+    # Auto-create tiles if requested
+    if params.has("auto_create_tiles") and params.auto_create_tiles:
+        var texture_size = texture.get_size()
+        var region_size = atlas_source.texture_region_size
+        var margins = atlas_source.margins
+        var separation = atlas_source.separation
+
+        var tiles_x = (texture_size.x - margins.x * 2 + separation.x) / (region_size.x + separation.x)
+        var tiles_y = (texture_size.y - margins.y * 2 + separation.y) / (region_size.y + separation.y)
+
+        if debug_mode:
+            print("Auto-creating tiles: " + str(tiles_x) + "x" + str(tiles_y))
+
+        for y in range(tiles_y):
+            for x in range(tiles_x):
+                var atlas_coords = Vector2i(x, y)
+                atlas_source.create_tile(atlas_coords)
+                if debug_mode:
+                    print("Created tile at atlas coords: " + str(atlas_coords))
+
+    # Save the TileSet
+    var save_error = ResourceSaver.save(tileset, full_tileset_path)
+    if debug_mode:
+        print("Save result: " + str(save_error) + " (OK=" + str(OK) + ")")
+
+    if save_error == OK:
+        print("Texture source added to TileSet successfully with ID: " + str(source_id))
+    else:
+        printerr("Failed to save TileSet: " + str(save_error))
 
 # Save changes to a scene file
 func save_scene(params):

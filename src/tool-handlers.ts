@@ -836,4 +836,24 @@ export class ToolHandlers {
       );
     }
   }
+
+  async handleCreateTilemap(args: any) {
+    return this.handleOperationTool('create TileMap', 'create_tilemap', args, ['projectPath', 'scenePath', 'tilemapName']);
+  }
+
+  async handleCreateTileset(args: any) {
+    return this.handleOperationTool('create TileSet', 'create_tileset', args, ['projectPath', 'tilesetPath']);
+  }
+
+  async handleSetTilemapSource(args: any) {
+    return this.handleOperationTool('set TileMap source', 'set_tilemap_source', args, ['projectPath', 'scenePath', 'tilemapPath', 'tilesetPath']);
+  }
+
+  async handlePaintTiles(args: any) {
+    return this.handleOperationTool('paint tiles', 'paint_tiles', args, ['projectPath', 'scenePath', 'tilemapPath', 'tiles']);
+  }
+
+  async handleAddTilesetSource(args: any) {
+    return this.handleOperationTool('add TileSet source', 'add_tileset_source', args, ['projectPath', 'tilesetPath', 'texturePath']);
+  }
 }
