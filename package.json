@@ -10,7 +10,7 @@
     "build"
   ],
   "scripts": {
-    "build": "tsc && node scripts/build.js",
+    "build": "tsc --noEmit && vite build && node scripts/build.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js"
@@ -22,7 +22,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite": "^7.1.5"
   },
   "license": "MIT",
   "repository": {
