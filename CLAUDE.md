@@ -24,7 +24,7 @@ This is an MCP (Model Context Protocol) server that enables AI assistants to int
    - Single comprehensive GDScript file handling complex Godot operations
    - Accepts operation type and parameters as JSON
    - Eliminates need for temporary script files
-   - Operations include scene creation, node management, sprite loading, mesh library export, UID management
+   - Operations include scene creation, node management, sprite loading, mesh library export, UID management, TileMap/TileSet editing and inspection
 
 ### Execution Patterns
 
@@ -47,6 +47,7 @@ The custom build script (`scripts/build.js`) performs:
 - **Scene management**: Create scenes, add nodes with properties, load sprites
 - **UID management**: Handle Godot 4.4+ UID system for resource references
 - **MeshLibrary export**: Export 3D scenes for GridMap usage
+- **TileMap & TileSet tooling**: Create, configure, paint, and read TileMap data as well as inspect TileSet atlas sources directly from MCP tools
 - **Project analysis**: Analyze project structure and provide metadata
 
 ### Environment Variables

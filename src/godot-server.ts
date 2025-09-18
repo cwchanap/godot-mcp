@@ -558,6 +558,46 @@ export class GodotServer {
             required: ['projectPath', 'tilesetPath', 'texturePath'],
           },
         },
+        {
+          name: 'read_tilemap',
+          description: 'Read TileMap data from a scene and return tile usage details',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Path to the scene containing the TileMap (relative to project)',
+              },
+              tilemapPath: {
+                type: 'string',
+                description: 'Path to the TileMap node within the scene (e.g., root/Level/TileMap). Defaults to scene root when omitted.',
+              },
+            },
+            required: ['projectPath', 'scenePath'],
+          },
+        },
+        {
+          name: 'read_tileset',
+          description: 'Read TileSet resource information including sources and atlas metadata',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              tilesetPath: {
+                type: 'string',
+                description: 'Path to the TileSet resource (relative to project)',
+              },
+            },
+            required: ['projectPath', 'tilesetPath'],
+          },
+        },
       ],
     }));
 
@@ -606,6 +646,10 @@ export class GodotServer {
           return await this.toolHandlers.handlePaintTiles(request.params.arguments);
         case 'add_tileset_source':
           return await this.toolHandlers.handleAddTilesetSource(request.params.arguments);
+        case 'read_tilemap':
+          return await this.toolHandlers.handleReadTilemap(request.params.arguments);
+        case 'read_tileset':
+          return await this.toolHandlers.handleReadTileset(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

@@ -14,6 +14,11 @@ import { OperationExecutor } from './operation-executor.js';
 
 const execAsync = promisify(exec);
 
+interface OperationToolOptions {
+  expectsJson?: boolean;
+  successMessage?: string;
+}
+
 export class ToolHandlers {
   private activeProcess: GodotProcess | null = null;
   private pathManager: GodotPathManager;
@@ -61,6 +66,29 @@ export class ToolHandlers {
     }
 
     return response;
+  }
+
+  private extractJsonFromOutput(output: string): any {
+    const trimmed = (output ?? '').trim();
+    if (!trimmed) {
+      throw new Error('No JSON content returned from Godot');
+    }
+
+    const lines = trimmed
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const line = lines[index];
+      try {
+        return JSON.parse(line);
+      } catch (error) {
+        this.logDebug(`Failed to parse JSON line: ${line}`);
+      }
+    }
+
+    throw new Error('Unable to parse JSON content from Godot output');
   }
 
   /**
@@ -678,7 +706,13 @@ export class ToolHandlers {
   /**
    * Handle operation-based tools generically
    */
-  async handleOperationTool(toolName: string, operation: string, args: any, requiredParams: string[]) {
+  async handleOperationTool(
+    toolName: string,
+    operation: string,
+    args: any,
+    requiredParams: string[],
+    options: OperationToolOptions = {}
+  ) {
     args = this.operationExecutor.normalizeParameters(args);
 
     // Check required parameters
@@ -691,8 +725,11 @@ export class ToolHandlers {
     }
 
     // Validate paths
-    const pathParams = requiredParams.filter(param => param.includes('Path'));
-    const invalidPaths = pathParams.filter(param => args[param] && !ProjectUtils.validatePath(args[param]));
+    const pathParams = Object.keys(args).filter(param => param.toLowerCase().includes('path'));
+    const invalidPaths = pathParams.filter(param => {
+      const value = args[param];
+      return typeof value === 'string' && !ProjectUtils.validatePath(value);
+    });
     if (invalidPaths.length > 0) {
       return this.createErrorResponse(
         'Invalid path',
@@ -725,6 +762,38 @@ export class ToolHandlers {
             'Ensure proper permissions',
           ]
         );
+      }
+
+      if (options.expectsJson) {
+        try {
+          const json = this.extractJsonFromOutput(stdout);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: options.successMessage || `${toolName} completed successfully.`,
+              },
+              {
+                type: 'text',
+                text: JSON.stringify(json, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          this.logDebug(
+            `Failed to parse JSON output for operation '${operation}': ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+          this.logDebug(`Raw stdout: ${stdout}`);
+          return this.createErrorResponse(
+            `Failed to ${toolName}: Unable to parse JSON output`,
+            [
+              'Run with DEBUG=true for verbose logging',
+              'Verify the requested resource exists and is readable',
+            ]
+          );
+        }
       }
 
       return {
@@ -855,5 +924,31 @@ export class ToolHandlers {
 
   async handleAddTilesetSource(args: any) {
     return this.handleOperationTool('add TileSet source', 'add_tileset_source', args, ['projectPath', 'tilesetPath', 'texturePath']);
+  }
+
+  async handleReadTilemap(args: any) {
+    return this.handleOperationTool(
+      'read TileMap',
+      'read_tilemap',
+      args,
+      ['projectPath', 'scenePath'],
+      {
+        expectsJson: true,
+        successMessage: 'TileMap data retrieved successfully.',
+      }
+    );
+  }
+
+  async handleReadTileset(args: any) {
+    return this.handleOperationTool(
+      'read TileSet',
+      'read_tileset',
+      args,
+      ['projectPath', 'tilesetPath'],
+      {
+        expectsJson: true,
+        successMessage: 'TileSet data retrieved successfully.',
+      }
+    );
   }
 }

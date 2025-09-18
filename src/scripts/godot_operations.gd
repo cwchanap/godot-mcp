@@ -81,6 +81,10 @@ func _init():
             paint_tiles(params)
         "add_tileset_source":
             add_tileset_source(params)
+        "read_tilemap":
+            read_tilemap(params)
+        "read_tileset":
+            read_tileset(params)
         _:
             log_error("Unknown operation: " + operation)
             quit(1)
@@ -1512,6 +1516,169 @@ func add_tileset_source(params):
         print("Texture source added to TileSet successfully with ID: " + str(source_id))
     else:
         printerr("Failed to save TileSet: " + str(save_error))
+
+func read_tilemap(params):
+    print("Reading TileMap from scene: " + params.scene_path)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    var scene = load(full_scene_path)
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+
+    var tilemap_path = params.tilemap_path if params.has("tilemap_path") else ""
+    if tilemap_path.begins_with("root/"):
+        tilemap_path = tilemap_path.substr(5)
+
+    var tilemap_node = scene_root
+    if tilemap_path != "":
+        tilemap_node = scene_root.get_node_or_null(tilemap_path)
+
+    if tilemap_node == null:
+        printerr("TileMap node not found: " + (params.tilemap_path if params.has("tilemap_path") else "<root>"))
+        quit(1)
+
+    if not tilemap_node is TileMap:
+        printerr("Node is not a TileMap: " + tilemap_node.get_class())
+        quit(1)
+
+    var result = {
+        "scenePath": params.scene_path,
+        "tilemapPath": params.tilemap_path if params.has("tilemap_path") else "",
+        "tileSetPath": "",
+        "layers": [],
+        "layerCount": 0,
+        "tileCount": 0
+    }
+
+    if tilemap_node.tile_set:
+        result.tileSetPath = tilemap_node.tile_set.resource_path
+
+    var layers_count = 1
+    if tilemap_node.has_method("get_layers_count"):
+        layers_count = tilemap_node.get_layers_count()
+    result.layerCount = layers_count
+
+    var total_tiles = 0
+    for layer in range(layers_count):
+        var layer_info = {
+            "index": layer,
+            "name": tilemap_node.get_layer_name(layer) if tilemap_node.has_method("get_layer_name") else "",
+            "tiles": [],
+            "tileCount": 0
+        }
+
+        var used_cells = tilemap_node.get_used_cells(layer)
+        for cell in used_cells:
+            var source_id = tilemap_node.get_cell_source_id(layer, cell)
+            var atlas_coords = tilemap_node.get_cell_atlas_coords(layer, cell)
+            var alternative_tile = tilemap_node.get_cell_alternative_tile(layer, cell)
+
+            var tile_data = {
+                "x": cell.x,
+                "y": cell.y,
+                "sourceId": source_id,
+                "alternativeTile": alternative_tile
+            }
+
+            if atlas_coords is Vector2i:
+                tile_data["atlasCoords"] = {"x": atlas_coords.x, "y": atlas_coords.y}
+            else:
+                tile_data["atlasCoords"] = atlas_coords
+
+            layer_info.tiles.append(tile_data)
+
+        layer_info.tileCount = layer_info.tiles.size()
+        total_tiles += layer_info.tileCount
+        result.layers.append(layer_info)
+
+    result.tileCount = total_tiles
+
+    print(JSON.stringify(result))
+
+func read_tileset(params):
+    print("Reading TileSet resource: " + params.tileset_path)
+
+    var full_tileset_path = params.tileset_path
+    if not full_tileset_path.begins_with("res://"):
+        full_tileset_path = "res://" + full_tileset_path
+
+    if not FileAccess.file_exists(full_tileset_path):
+        printerr("TileSet file does not exist at: " + full_tileset_path)
+        quit(1)
+
+    var tileset = load(full_tileset_path)
+    if not tileset:
+        printerr("Failed to load TileSet: " + full_tileset_path)
+        quit(1)
+
+    if not tileset is TileSet:
+        printerr("Resource is not a TileSet: " + full_tileset_path)
+        quit(1)
+
+    var sources = []
+    var source_count = tileset.get_source_count()
+    for index in range(source_count):
+        var source_id = tileset.get_source_id(index)
+        var source = tileset.get_source(source_id)
+        if source == null:
+            continue
+
+        var source_info = {
+            "id": source_id,
+            "type": source.get_class()
+        }
+
+        if source is TileSetAtlasSource:
+            if source.texture:
+                source_info["texturePath"] = source.texture.resource_path
+
+            var region_size = source.texture_region_size
+            source_info["textureRegionSize"] = {"x": region_size.x, "y": region_size.y}
+
+            var margins = source.margins
+            source_info["margins"] = {"x": margins.x, "y": margins.y}
+
+            var separation = source.separation
+            source_info["separation"] = {"x": separation.x, "y": separation.y}
+
+            if source.has_method("get_tiles_count") and source.has_method("get_tile_id"):
+                var tile_ids = []
+                var tiles_count = int(source.call("get_tiles_count"))
+                for i in range(tiles_count):
+                    var raw_id = source.call("get_tile_id", i)
+                    if raw_id is Vector2i:
+                        tile_ids.append({"x": raw_id.x, "y": raw_id.y})
+                    else:
+                        tile_ids.append(raw_id)
+                source_info["tileIds"] = tile_ids
+                source_info["tileCount"] = tile_ids.size()
+            else:
+                source_info["tileCount"] = 0
+        else:
+            if source.has_method("get_tiles_count"):
+                source_info["tileCount"] = int(source.call("get_tiles_count"))
+            else:
+                source_info["tileCount"] = 0
+
+        sources.append(source_info)
+
+    var result = {
+        "tilesetPath": params.tileset_path,
+        "sourceCount": sources.size(),
+        "sources": sources
+    }
+
+    print(JSON.stringify(result))
 
 # Save changes to a scene file
 func save_scene(params):
