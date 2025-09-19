@@ -56,6 +56,13 @@ The custom build script (`scripts/build.js`) performs:
 - `GODOT_PATH`: Override automatic Godot executable detection
 - `DEBUG`: Enable detailed server-side logging when set to "true"
 
+### Runtime Argument Configuration
+
+- The CLI now accepts `argumentConfig` JSON or `--godot-path` to inject configuration at launch time.
+- Supported keys mirror `GodotServerConfig` (`godotPath`, `debugMode`, `godotDebugMode`, `strictPathValidation`).
+- Config can be supplied via CLI flags (e.g. `node build/index.js --godot-path /path/to/godot`) or JSON (`--config '{"godotPath":"/path"}'`). Use an empty string or `null` to clear a previously provided path and trigger auto-detection.
+- MCP hosts that support `argumentConfig` may provide the same JSON via environment (e.g. `MCP_ARGUMENT_CONFIG`).
+
 ## Project Structure
 
 ```

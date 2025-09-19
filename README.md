@@ -184,6 +184,15 @@ You can customize the server behavior with these environment variables:
 - `GODOT_PATH`: Path to the Godot executable (overrides automatic detection)
 - `DEBUG`: Set to "true" to enable detailed server-side debug logging
 
+### Step 4: Optional Argument Configuration
+
+When running the CLI directly or through an MCP host that supports `argumentConfig`, you can pass configuration without mutating environment variables:
+
+- Provide the Godot path explicitly: `node build/index.js --godot-path /absolute/path/to/Godot`
+- Pass a JSON blob: `node build/index.js --config '{"godotPath":"/absolute/path/to/Godot"}'`
+- Provide an empty string or `null` in JSON (e.g. `{"godotPath":""}`) to clear a previously cached path and fall back to automatic detection
+- MCP hosts can send the same JSON via `argumentConfig`; the server reads from `MCP_ARGUMENT_CONFIG`, `MCP_SERVER_ARGUMENT_CONFIG`, or `MCP_CONFIG`
+
 ## Example Prompts
 
 Once configured, your AI assistant will automatically run the MCP server when needed. You can use prompts like:
