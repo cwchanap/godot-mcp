@@ -168,14 +168,23 @@ export class GodotPathManager {
       // In strict mode, throw an error
       throw new Error(`Could not find a valid Godot executable. Set GODOT_PATH or provide a valid path in config.`);
     } else {
-      // Fallback to a default path in non-strict mode; this may not be valid and requires user configuration for reliability
+      // Fallback to a default path in non-strict mode; pick the first candidate that exists
+      let fallbackCandidates: string[] = [];
+
       if (osPlatform === 'win32') {
-        this.godotPath = normalize('C:\\Program Files\\Godot\\Godot.exe');
+        fallbackCandidates = ['C\\\\Program Files\\\\Godot\\\\Godot.exe'];
       } else if (osPlatform === 'darwin') {
-        this.godotPath = normalize('/Applications/Godot.app/Contents/MacOS/Godot');
+        fallbackCandidates = [
+          '/Applications/Godot.app/Contents/MacOS/Godot',
+          '/Applications/Godot_mono.app/Contents/MacOS/Godot',
+        ];
       } else {
-        this.godotPath = normalize('/usr/bin/godot');
+        fallbackCandidates = ['/usr/bin/godot'];
       }
+
+      const selectedFallback = fallbackCandidates.find(candidate => existsSync(candidate)) ?? fallbackCandidates[0];
+
+      this.godotPath = normalize(selectedFallback);
 
       this.logDebug(`Using default path: ${this.godotPath}, but this may not work.`);
       console.warn(`[GODOT-PATH] Using default path: ${this.godotPath}, but this may not work.`);

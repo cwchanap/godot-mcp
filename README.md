@@ -90,7 +90,17 @@ This direct feedback loop helps AI assistants like Claude understand what works 
 
 ### Step 1: Install and Build
 
-First, clone the repository and build the MCP server:
+You can either run the published package directly with `npx` or build it from source.
+
+#### Option A: Run via npx
+
+```bash
+npx godot-mcp
+```
+
+This downloads the CLI on demand, runs the server immediately, and keeps cached builds up to date. Set `GODOT_PATH` if your Godot executable is not on `PATH`.
+
+#### Option B: Build from source
 
 ```bash
 git clone https://github.com/Coding-Solo/godot-mcp.git

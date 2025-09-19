@@ -10,12 +10,14 @@
     "build"
   ],
   "scripts": {
-    "build": "tsc --noEmit && vite build && node scripts/build.js",
+    "build": "npm run typecheck && tsc -p tsconfig.build.json && node scripts/build.js",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector build/index.js"
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
@@ -39,5 +41,17 @@
     "ai",
     "claude",
     "cline"
-  ]
+  ],
+  "main": "./build/index.js",
+  "module": "./build/index.js",
+  "types": "./build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
 }
