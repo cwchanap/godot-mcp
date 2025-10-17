@@ -17,6 +17,8 @@ const execAsync = promisify(exec);
 interface OperationToolOptions {
   expectsJson?: boolean;
   successMessage?: string;
+  requiresEditorContext?: boolean;
+  possibleErrorSolutions?: string[];
 }
 
 export class ToolHandlers {
@@ -751,12 +753,20 @@ export class ToolHandlers {
       // Prepare parameters (remove projectPath as it's used for execution context)
       const { projectPath, ...params } = args;
 
-      const { stdout, stderr } = await this.operationExecutor.executeOperation(operation, params, projectPath, this.pathManager);
+      const { stdout, stderr } = await this.operationExecutor.executeOperation(
+        operation,
+        params,
+        projectPath,
+        this.pathManager,
+        {
+          useEditor: options.requiresEditorContext === true,
+        }
+      );
 
       if (stderr && stderr.includes('Failed to')) {
         return this.createErrorResponse(
           `Failed to ${toolName}: ${stderr}`,
-          [
+          options.possibleErrorSolutions ?? [
             'Check the operation parameters',
             'Verify file paths are correct',
             'Ensure proper permissions',
@@ -807,7 +817,7 @@ export class ToolHandlers {
     } catch (error: any) {
       return this.createErrorResponse(
         `Failed to ${toolName}: ${error?.message || 'Unknown error'}`,
-        [
+        options.possibleErrorSolutions ?? [
           'Ensure Godot is installed correctly',
           'Check if the GODOT_PATH environment variable is set correctly',
           'Verify the project path is accessible',
@@ -827,6 +837,68 @@ export class ToolHandlers {
 
   async handleSaveScene(args: any) {
     return this.handleOperationTool('save scene', 'save_scene', args, ['projectPath', 'scenePath']);
+  }
+
+  async handleReimportAsset(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.projectPath) {
+      return this.createErrorResponse(
+        'Project path is required',
+        ['Provide a valid path to a Godot project directory']
+      );
+    }
+
+    const collectedPaths: string[] = [];
+
+    if (typeof args.assetPath === 'string' && args.assetPath.trim().length > 0) {
+      collectedPaths.push(args.assetPath.trim());
+    }
+
+    if (Array.isArray(args.assetPaths)) {
+      for (const entry of args.assetPaths) {
+        if (typeof entry === 'string' && entry.trim().length > 0) {
+          collectedPaths.push(entry.trim());
+        }
+      }
+    }
+
+    if (collectedPaths.length === 0) {
+      return this.createErrorResponse(
+        'Provide assetPath or assetPaths with at least one valid asset to re-import',
+        ['Pass a single assetPath string', 'Or supply assetPaths as an array of resource paths']
+      );
+    }
+
+    const invalidPaths = collectedPaths.filter(assetPath => !ProjectUtils.validatePath(assetPath));
+    if (invalidPaths.length > 0) {
+      return this.createErrorResponse(
+        `Invalid asset paths: ${invalidPaths.join(', ')}`,
+        ['Remove ".." segments or other unsafe characters from asset paths']
+      );
+    }
+
+    // Ensure we send a normalized array of asset paths to the operation.
+    args.assetPaths = collectedPaths;
+    delete args.assetPath;
+
+    return this.handleOperationTool(
+      're-import asset',
+      'reimport_asset',
+      args,
+      ['projectPath'],
+      {
+        expectsJson: true,
+        successMessage: 'Assets re-imported successfully.',
+        requiresEditorContext: true,
+        possibleErrorSolutions: [
+          'Check the operation parameters',
+          'Verify file paths are correct',
+          'Ensure proper permissions',
+          'Run Godot in editor mode for asset operations'
+        ]
+      }
+    );
   }
 
   async handleGetUid(args: any) {
@@ -922,6 +994,15 @@ export class ToolHandlers {
     return this.handleOperationTool('paint tiles', 'paint_tiles', args, ['projectPath', 'scenePath', 'tilemapPath', 'tiles']);
   }
 
+  async handlePaintTilesToLayer(args: any) {
+    return this.handleOperationTool(
+      'paint TileMapLayer tiles',
+      'paint_tiles_to_layer',
+      args,
+      ['projectPath', 'scenePath', 'tilemapLayerPath', 'tiles']
+    );
+  }
+
   async handleAddTilesetSource(args: any) {
     return this.handleOperationTool('add TileSet source', 'add_tileset_source', args, ['projectPath', 'tilesetPath', 'texturePath']);
   }
@@ -935,6 +1016,19 @@ export class ToolHandlers {
       {
         expectsJson: true,
         successMessage: 'TileMap data retrieved successfully.',
+      }
+    );
+  }
+
+  async handleReadTilemapLayerUsedCells(args: any) {
+    return this.handleOperationTool(
+      'read TileMapLayer',
+      'read_tilemap_layer_used_cells',
+      args,
+      ['projectPath', 'scenePath', 'tilemapLayerPath'],
+      {
+        expectsJson: true,
+        successMessage: 'TileMapLayer data retrieved successfully.',
       }
     );
   }

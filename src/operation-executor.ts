@@ -4,17 +4,24 @@
 
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import { dirname, join } from 'path';
 import { OperationParams, PARAMETER_MAPPINGS } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 
 const execAsync = promisify(exec);
 
+interface OperationExecutionOptions {
+  useEditor?: boolean;
+}
+
 export class OperationExecutor {
   private reverseParameterMappings: Record<string, string> = {};
   private operationsScriptPath: string;
+  private editorOperationsScriptPath: string;
 
   constructor(operationsScriptPath: string) {
     this.operationsScriptPath = operationsScriptPath;
+    this.editorOperationsScriptPath = join(dirname(operationsScriptPath), 'editor_reimport.gd');
 
     // Initialize reverse parameter mappings
     for (const [snakeCase, camelCase] of Object.entries(PARAMETER_MAPPINGS)) {
@@ -73,11 +80,19 @@ export class OperationExecutor {
         // Convert camelCase to snake_case
         const snakeKey = this.reverseParameterMappings[key] || key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
-        // Handle nested objects recursively
-        if (typeof params[key] === 'object' && params[key] !== null && !Array.isArray(params[key])) {
-          result[snakeKey] = this.convertCamelToSnakeCase(params[key] as OperationParams);
+        const value = params[key];
+        // Handle nested objects and arrays recursively
+        if (Array.isArray(value)) {
+          result[snakeKey] = value.map((item) => {
+            if (item && typeof item === 'object' && !Array.isArray(item)) {
+              return this.convertCamelToSnakeCase(item as OperationParams);
+            }
+            return item;
+          });
+        } else if (typeof value === 'object' && value !== null) {
+          result[snakeKey] = this.convertCamelToSnakeCase(value as OperationParams);
         } else {
-          result[snakeKey] = params[key];
+          result[snakeKey] = value;
         }
       }
     }
@@ -92,7 +107,8 @@ export class OperationExecutor {
     operation: string,
     params: OperationParams,
     projectPath: string,
-    pathManager: GodotPathManager
+    pathManager: GodotPathManager,
+    options: OperationExecutionOptions = {}
   ): Promise<{ stdout: string; stderr: string }> {
     this.logDebug(`Executing operation: ${operation} in project: ${projectPath}`);
     this.logDebug(`Original operation params: ${JSON.stringify(params)}`);
@@ -127,18 +143,36 @@ export class OperationExecutor {
       // Add debug arguments if debug mode is enabled
       const debugArgs = process.env.GODOT_DEBUG_MODE === 'true' ? ['--debug-godot'] : [];
 
-      // Construct the command with the operation and JSON parameters
-      const cmd = [
-        `"${godotPath}"`,
-        '--headless',
-        '--path',
-        `"${projectPath}"`,
-        '--script',
-        `"${this.operationsScriptPath}"`,
-        operation,
-        quotedParams, // Pass the JSON string as a single argument
-        ...debugArgs,
-      ].join(' ');
+      let cmdParts: string[] = [];
+
+      if (options.useEditor) {
+        cmdParts = [
+          `"${godotPath}"`,
+          '--headless',
+          '--editor',
+          '--quit',
+          '--path',
+          `"${projectPath}"`,
+          '--script',
+          `"${this.editorOperationsScriptPath}"`,
+          operation,
+          quotedParams,
+        ];
+      } else {
+        // Default to regular operations script
+        cmdParts = [
+          `"${godotPath}"`,
+          '--headless',
+          '--path',
+          `"${projectPath}"`,
+          '--script',
+          `"${this.operationsScriptPath}"`,
+          operation,
+          quotedParams,
+        ];
+      }
+
+      const cmd = [...cmdParts, ...debugArgs].join(' ');
 
       this.logDebug(`Command: ${cmd}`);
 

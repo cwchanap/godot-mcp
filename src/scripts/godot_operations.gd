@@ -67,6 +67,8 @@ func _init():
             export_mesh_library(params)
         "save_scene":
             save_scene(params)
+        "reimport_asset":
+            reimport_asset(params)
         "get_uid":
             get_uid(params)
         "resave_resources":
@@ -79,10 +81,14 @@ func _init():
             set_tilemap_source(params)
         "paint_tiles":
             paint_tiles(params)
+        "paint_tiles_to_layer":
+            paint_tiles_to_layer(params)
         "add_tileset_source":
             add_tileset_source(params)
         "read_tilemap":
             read_tilemap(params)
+        "read_tilemap_layer_used_cells":
+            read_tilemap_layer_used_cells(params)
         "read_tileset":
             read_tileset(params)
         _:
@@ -905,6 +911,128 @@ func find_files(path, extension):
     
     return files
 
+# Re-import one or more assets using the editor import pipeline
+func reimport_asset(params):
+    if debug_mode:
+        print("Starting asset re-import with parameters: " + JSON.stringify(params))
+
+    var provided_paths = []
+
+    if params.has("asset_paths"):
+        var asset_paths_param = params.asset_paths
+        if asset_paths_param is Array:
+            for entry in asset_paths_param:
+                if typeof(entry) == TYPE_STRING and entry.strip_edges() != "":
+                    provided_paths.append(entry.strip_edges())
+        elif asset_paths_param is PackedStringArray:
+            for entry_index in range(asset_paths_param.size()):
+                var entry = asset_paths_param[entry_index]
+                if typeof(entry) == TYPE_STRING and entry.strip_edges() != "":
+                    provided_paths.append(entry.strip_edges())
+
+    if params.has("asset_path") and typeof(params.asset_path) == TYPE_STRING and params.asset_path.strip_edges() != "":
+        provided_paths.append(params.asset_path.strip_edges())
+
+    if provided_paths.is_empty():
+        printerr("No asset paths provided. Supply asset_path or asset_paths.")
+        quit(1)
+
+    if not Engine.is_editor_hint():
+        printerr("Re-import requires editor context. Ensure the Godot process is launched with --editor.")
+        quit(1)
+
+    if not ClassDB.class_exists("EditorFileSystem"):
+        printerr("EditorFileSystem class is not available in this Godot build. Cannot re-import assets.")
+        quit(1)
+
+    if not Engine.has_singleton("EditorFileSystem"):
+        printerr("EditorFileSystem singleton is unavailable. Ensure Godot runs with --editor.")
+        quit(1)
+
+    var editor_fs = Engine.get_singleton("EditorFileSystem")
+    if editor_fs == null:
+        printerr("Failed to access EditorFileSystem singleton instance.")
+        quit(1)
+
+    if not editor_fs is EditorFileSystem:
+        printerr("Retrieved singleton is not an EditorFileSystem instance: " + editor_fs.get_class())
+        quit(1)
+
+    # Ensure the file system is ready before issuing re-import requests
+    if editor_fs.is_scanning():
+        if debug_mode:
+            print("EditorFileSystem is scanning. Waiting for completion before re-import...")
+        var wait_time = 0
+        while editor_fs.is_scanning() and wait_time < 20000:
+            OS.delay_msec(100)
+            wait_time += 100
+
+        if editor_fs.is_scanning():
+            printerr("EditorFileSystem scanning did not finish within the timeout window.")
+            quit(1)
+
+    var normalized_paths = []
+    var missing_assets = []
+    var to_reimport = PackedStringArray()
+
+    for raw_path in provided_paths:
+        var normalized = raw_path
+        if not normalized.begins_with("res://"):
+            normalized = "res://" + normalized
+
+        var trimmed = normalized.strip_edges()
+        if trimmed == "res://":
+            continue
+
+        var file_exists = FileAccess.file_exists(trimmed)
+        if not file_exists:
+            missing_assets.append(trimmed)
+            continue
+
+        normalized_paths.append(trimmed)
+        to_reimport.append(trimmed)
+
+    if normalized_paths.is_empty():
+        printerr("No valid assets found to re-import. Missing assets: " + str(missing_assets))
+        quit(1)
+
+    if debug_mode:
+        print("Assets scheduled for re-import: " + str(normalized_paths))
+
+    editor_fs.reimport_files(to_reimport)
+
+    # Reimport triggers a scan operation; wait for completion for deterministic behaviour
+    var elapsed = 0
+    while editor_fs.is_scanning() and elapsed < 60000:
+        OS.delay_msec(100)
+        elapsed += 100
+
+    if editor_fs.is_scanning():
+        printerr("Asset re-import did not finish within the timeout window (60s).")
+        quit(1)
+
+    # Refresh the filesystem to ensure metadata is up to date
+    editor_fs.scan()
+
+    elapsed = 0
+    while editor_fs.is_scanning() and elapsed < 20000:
+        OS.delay_msec(100)
+        elapsed += 100
+
+    if editor_fs.is_scanning():
+        printerr("Filesystem scan after re-import did not complete in time.")
+        quit(1)
+
+    var result = {
+        "reimportedAssets": normalized_paths,
+        "skippedAssets": missing_assets
+    }
+
+    if missing_assets.size() > 0:
+        result["warning"] = "Some assets were not found and were skipped."
+
+    print(JSON.stringify(result))
+
 # Get UID for a specific file
 func get_uid(params):
     if not params.has("file_path"):
@@ -1411,6 +1539,99 @@ func paint_tiles(params):
     else:
         printerr("Failed to pack scene: " + str(result))
 
+# Paint tiles on a TileMapLayer
+func paint_tiles_to_layer(params):
+    print("Painting tiles on TileMapLayer in scene: " + params.scene_path)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+
+    if debug_mode:
+        print("Scene path (with res://): " + full_scene_path)
+
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    var scene = load(full_scene_path)
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+    if debug_mode:
+        print("Scene loaded successfully")
+
+    var layer_path = params.tilemap_layer_path
+    if debug_mode:
+        print("Original TileMapLayer path: " + layer_path)
+
+    if layer_path.begins_with("root/"):
+        layer_path = layer_path.substr(5)
+        if debug_mode:
+            print("TileMapLayer path after removing 'root/' prefix: " + layer_path)
+
+    var layer_node = scene_root.get_node_or_null(layer_path)
+    if not layer_node:
+        printerr("TileMapLayer node not found: " + params.tilemap_layer_path)
+        quit(1)
+
+    if debug_mode:
+        print("Found TileMapLayer node: " + layer_node.name)
+
+    if not layer_node is TileMapLayer:
+        printerr("Node is not a TileMapLayer: " + layer_node.get_class())
+        quit(1)
+
+    var tiles = params.tiles
+    if debug_mode:
+        print("Painting " + str(tiles.size()) + " tiles on TileMapLayer")
+
+    for tile_data in tiles:
+        var x = int(tile_data.x)
+        var y = int(tile_data.y)
+        var source_id = int(tile_data.source_id)
+        var atlas_coords = Vector2i.ZERO
+        if tile_data.has("atlas_x") and tile_data.has("atlas_y"):
+            atlas_coords = Vector2i(int(tile_data.atlas_x), int(tile_data.atlas_y))
+        var alternative_tile = 0
+        if tile_data.has("alternative_tile"):
+            alternative_tile = int(tile_data.alternative_tile)
+
+        if debug_mode:
+            print(
+                "Painting TileMapLayer tile at (" + str(x) + ", " + str(y) + ") with source_id=" + str(source_id) +
+                ", atlas_coords=" + str(atlas_coords) + ", alternative=" + str(alternative_tile)
+            )
+
+        # If source_id is negative, treat this as an erase operation for convenience
+        if source_id < 0:
+            layer_node.erase_cell(Vector2i(x, y))
+        else:
+            layer_node.set_cell(Vector2i(x, y), source_id, atlas_coords, alternative_tile)
+
+    if debug_mode:
+        print("All TileMapLayer tiles painted successfully")
+        var used_after = layer_node.get_used_cells()
+        print("TileMapLayer used cells after painting: " + str(used_after.size()))
+
+    var packed_scene = PackedScene.new()
+    var result = packed_scene.pack(scene_root)
+    if debug_mode:
+        print("Pack result: " + str(result) + " (OK=" + str(OK) + ")")
+
+    if result == OK:
+        var save_error = ResourceSaver.save(packed_scene, full_scene_path)
+        if debug_mode:
+            print("Save result: " + str(save_error) + " (OK=" + str(OK) + ")")
+        if save_error == OK:
+            print("Tiles painted successfully on TileMapLayer")
+        else:
+            printerr("Failed to save scene: " + str(save_error))
+    else:
+        printerr("Failed to pack scene: " + str(result))
+
 # Add a texture source to an existing TileSet
 func add_tileset_source(params):
     print("Adding texture source to TileSet: " + params.tileset_path)
@@ -1602,6 +1823,73 @@ func read_tilemap(params):
         result.layers.append(layer_info)
 
     result.tileCount = total_tiles
+
+    print(JSON.stringify(result))
+
+func read_tilemap_layer_used_cells(params):
+    print("Reading TileMapLayer from scene: " + params.scene_path)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    var scene = load(full_scene_path)
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+
+    var layer_path = params.tilemap_layer_path
+    if layer_path.begins_with("root/"):
+        layer_path = layer_path.substr(5)
+
+    var layer_node = scene_root.get_node_or_null(layer_path)
+    if not layer_node:
+        printerr("TileMapLayer node not found: " + params.tilemap_layer_path)
+        quit(1)
+
+    if not layer_node is TileMapLayer:
+        printerr("Node is not a TileMapLayer: " + layer_node.get_class())
+        quit(1)
+
+    var tiles = []
+    var used_cells = layer_node.get_used_cells()
+    for cell in used_cells:
+        var tile_info = {
+            "x": cell.x,
+            "y": cell.y,
+            "sourceId": layer_node.get_cell_source_id(cell),
+            "atlasX": 0,
+            "atlasY": 0,
+            "alternativeTile": layer_node.get_cell_alternative_tile(cell)
+        }
+
+        var atlas_coords = layer_node.get_cell_atlas_coords(cell)
+        if atlas_coords is Vector2i:
+            tile_info["atlasX"] = atlas_coords.x
+            tile_info["atlasY"] = atlas_coords.y
+        elif atlas_coords is Vector2:
+            tile_info["atlasX"] = int(round(atlas_coords.x))
+            tile_info["atlasY"] = int(round(atlas_coords.y))
+        elif typeof(atlas_coords) == TYPE_DICTIONARY:
+            if atlas_coords.has("x"):
+                tile_info["atlasX"] = int(atlas_coords.x)
+            if atlas_coords.has("y"):
+                tile_info["atlasY"] = int(atlas_coords.y)
+
+        tiles.append(tile_info)
+
+    var result = {
+        "scenePath": params.scene_path,
+        "tilemapLayerPath": params.tilemap_layer_path,
+        "tileCount": tiles.size(),
+        "tiles": tiles
+    }
 
     print(JSON.stringify(result))
 

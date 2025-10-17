@@ -48,6 +48,7 @@ export const PARAMETER_MAPPINGS: Record<string, string> = {
   'recursive': 'recursive',
   'scene': 'scene',
   'tilemap_path': 'tilemapPath',
+  'tilemap_layer_path': 'tilemapLayerPath',
   'tileset_path': 'tilesetPath',
   'tilemap_name': 'tilemapName',
 };

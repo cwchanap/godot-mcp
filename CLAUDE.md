@@ -48,7 +48,8 @@ The custom build script (`scripts/build.js`) performs:
 - **Scene management**: Create scenes, add nodes with properties, load sprites
 - **UID management**: Handle Godot 4.4+ UID system for resource references
 - **MeshLibrary export**: Export 3D scenes for GridMap usage
-- **TileMap & TileSet tooling**: Create, configure, paint, and read TileMap data as well as inspect TileSet atlas sources directly from MCP tools
+- **TileMap & TileSet tooling**: Create, configure, paint, and read TileMap data as well as inspect TileSet atlas sources directly from MCP tools; includes TileMapLayer read/paint support for Godot 4 workflows
+- **Asset re-import**: Trigger Godot's importer pipeline for one or more assets via the MCP server to refresh `.import` artifacts headlessly
 - **Project analysis**: Analyze project structure and provide metadata
 
 ### Environment Variables

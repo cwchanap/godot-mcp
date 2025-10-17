@@ -315,6 +315,31 @@ export class GodotServer {
           },
         },
         {
+          name: 'reimport_asset',
+          description: 'Re-import one or more assets using the Godot importer pipeline',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              assetPath: {
+                type: 'string',
+                description: 'Single asset to re-import (relative to project or res://)',
+              },
+              assetPaths: {
+                type: 'array',
+                description: 'List of assets to re-import',
+                items: {
+                  type: 'string',
+                },
+              },
+            },
+            required: ['projectPath'],
+          },
+        },
+        {
           name: 'get_uid',
           description: 'Get the UID for a specific file in a Godot project (for Godot 4.4+)',
           inputSchema: {
@@ -483,6 +508,62 @@ export class GodotServer {
           },
         },
         {
+          name: 'paint_tiles_to_layer',
+          description: 'Paint tiles on a TileMapLayer node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Path to the scene file (relative to project)',
+              },
+              tilemapLayerPath: {
+                type: 'string',
+                description: 'Path to the TileMapLayer node (e.g., "root/Level/GroundLayer")',
+              },
+              tiles: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    x: {
+                      type: 'integer',
+                      description: 'X coordinate of the tile',
+                    },
+                    y: {
+                      type: 'integer',
+                      description: 'Y coordinate of the tile',
+                    },
+                    sourceId: {
+                      type: 'integer',
+                      description: 'Source ID from the TileSet',
+                    },
+                    atlasX: {
+                      type: 'integer',
+                      description: 'X coordinate in the atlas (optional, default 0)',
+                    },
+                    atlasY: {
+                      type: 'integer',
+                      description: 'Y coordinate in the atlas (optional, default 0)',
+                    },
+                    alternativeTile: {
+                      type: 'integer',
+                      description: 'Alternative tile ID (optional, default 0)',
+                    },
+                  },
+                  required: ['x', 'y', 'sourceId'],
+                },
+                description: 'Array of tile data to paint',
+              },
+            },
+            required: ['projectPath', 'scenePath', 'tilemapLayerPath', 'tiles'],
+          },
+        },
+        {
           name: 'add_tileset_source',
           description: 'Add a texture source to an existing TileSet',
           inputSchema: {
@@ -581,6 +662,28 @@ export class GodotServer {
           },
         },
         {
+          name: 'read_tilemap_layer_used_cells',
+          description: 'Read used cells from a TileMapLayer with full tile information',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Path to the scene containing the TileMapLayer (relative to project)',
+              },
+              tilemapLayerPath: {
+                type: 'string',
+                description: 'Path to the TileMapLayer node (e.g., "root/Game/GridMap/GroundLayer")',
+              },
+            },
+            required: ['projectPath', 'scenePath', 'tilemapLayerPath'],
+          },
+        },
+        {
           name: 'read_tileset',
           description: 'Read TileSet resource information including sources and atlas metadata',
           inputSchema: {
@@ -632,6 +735,8 @@ export class GodotServer {
           return await this.toolHandlers.handleExportMeshLibrary(request.params.arguments);
         case 'save_scene':
           return await this.toolHandlers.handleSaveScene(request.params.arguments);
+        case 'reimport_asset':
+          return await this.toolHandlers.handleReimportAsset(request.params.arguments);
         case 'get_uid':
           return await this.toolHandlers.handleGetUid(request.params.arguments);
         case 'update_project_uids':
@@ -644,10 +749,14 @@ export class GodotServer {
           return await this.toolHandlers.handleSetTilemapSource(request.params.arguments);
         case 'paint_tiles':
           return await this.toolHandlers.handlePaintTiles(request.params.arguments);
+        case 'paint_tiles_to_layer':
+          return await this.toolHandlers.handlePaintTilesToLayer(request.params.arguments);
         case 'add_tileset_source':
           return await this.toolHandlers.handleAddTilesetSource(request.params.arguments);
         case 'read_tilemap':
           return await this.toolHandlers.handleReadTilemap(request.params.arguments);
+        case 'read_tilemap_layer_used_cells':
+          return await this.toolHandlers.handleReadTilemapLayerUsedCells(request.params.arguments);
         case 'read_tileset':
           return await this.toolHandlers.handleReadTileset(request.params.arguments);
         default:
@@ -682,7 +791,7 @@ export class GodotServer {
         console.warn('[GODOT-SERVER] This may cause issues when executing Godot commands');
       }
 
-      console.log(`[GODOT-SERVER] Using Godot at: ${godotPath}`);
+      console.error(`[GODOT-SERVER] Using Godot at: ${godotPath}`);
 
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
