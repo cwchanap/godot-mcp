@@ -27,4 +27,7 @@ Thumbs.db
 # Coverage directory
 coverage/
 
+# Local worktrees
+.worktrees/
+
 tilemap-test-project
