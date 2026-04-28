@@ -1,22 +1,21 @@
 import { constants, readFileSync } from 'node:fs';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { RuntimeBridgeStatus, RuntimeState } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BRIDGE_VERSION_PLACEHOLDER = '__PACKAGE_VERSION__';
 const RUNTIME_BRIDGE_DIRNAME = 'godot_mcp_runtime';
 const RUNTIME_BRIDGE_SCRIPT = 'runtime_bridge.gd';
 const RUNTIME_BRIDGE_MANIFEST = 'bridge_manifest.json';
+const GENERATED_BRIDGE_MANIFEST = 'runtime_bridge_manifest.json';
 
 export class RuntimeControlManager {
-  private readonly runtimeBridgeScriptPath = join(__dirname, 'scripts', RUNTIME_BRIDGE_SCRIPT);
-  private readonly runtimeBridgeManifestPath = join(__dirname, 'scripts', 'runtime_bridge_manifest.json');
-  private readonly packageVersion = JSON.parse(
-    readFileSync(join(__dirname, '..', 'package.json'), 'utf8')
-  ).version as string;
+  private readonly runtimeBridgeAssetsDir = join(__dirname, '..', 'build', 'scripts');
+  private readonly runtimeBridgeScriptPath = join(this.runtimeBridgeAssetsDir, RUNTIME_BRIDGE_SCRIPT);
+  private readonly runtimeBridgeManifestPath = join(this.runtimeBridgeAssetsDir, GENERATED_BRIDGE_MANIFEST);
+  private readonly bridgeVersion = this.readGeneratedBridgeVersion();
 
   getRuntimeState(): RuntimeState {
     return { connected: false, sessionId: null, scenePath: null };
@@ -46,7 +45,7 @@ export class RuntimeControlManager {
       return {
         installed: true,
         version,
-        compatible: version === this.packageVersion,
+        compatible: version === this.bridgeVersion,
       };
     } catch {
       return { installed: true, version: null, compatible: false };
@@ -63,11 +62,7 @@ export class RuntimeControlManager {
   }
 
   private async copyBridgeAsset(sourcePath: string, destinationPath: string): Promise<void> {
-    const template = await readFile(sourcePath, 'utf8');
-    await writeFile(
-      destinationPath,
-      template.replaceAll(BRIDGE_VERSION_PLACEHOLDER, this.packageVersion)
-    );
+    await copyFile(sourcePath, destinationPath);
   }
 
   private async pathExists(targetPath: string): Promise<boolean> {
@@ -77,5 +72,15 @@ export class RuntimeControlManager {
     } catch {
       return false;
     }
+  }
+
+  private readGeneratedBridgeVersion(): string {
+    const manifest = JSON.parse(readFileSync(this.runtimeBridgeManifestPath, 'utf8')) as { version?: string };
+
+    if (!manifest.version) {
+      throw new Error(`Generated runtime bridge manifest is missing a version: ${this.runtimeBridgeManifestPath}`);
+    }
+
+    return manifest.version;
   }
 }
