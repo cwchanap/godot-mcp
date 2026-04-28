@@ -81,3 +81,15 @@ export interface GodotProjectRef {
   path: string;
   name: string;
 }
+
+export interface RuntimeState {
+  connected: boolean;
+  sessionId: string | null;
+  scenePath: string | null;
+}
+
+export interface RuntimeBridgeStatus {
+  installed: boolean;
+  version: string | null;
+  compatible: boolean;
+}
