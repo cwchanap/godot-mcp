@@ -1,0 +1,6 @@
+{
+  "name": "godot_mcp_runtime",
+  "version": "__PACKAGE_VERSION__",
+  "autoloadName": "GodotMcpRuntimeBridge",
+  "entryScript": "runtime_bridge.gd"
+}

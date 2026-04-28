@@ -2,25 +2,42 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the directory name
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const buildScriptsDir = path.join(__dirname, '..', 'build', 'scripts');
+const packageVersion = fs.readJsonSync(path.join(__dirname, '..', 'package.json')).version;
 
-// Make the build/index.js file executable
 fs.chmodSync(path.join(__dirname, '..', 'build', 'index.js'), '755');
-// Copy the scripts directory to the build directory
+
 try {
-  // Ensure the build/scripts directory exists
-  fs.ensureDirSync(path.join(__dirname, '..', 'build', 'scripts'));
-  
+  fs.ensureDirSync(buildScriptsDir);
+
   const scriptsToCopy = ['godot_operations.gd', 'editor_reimport.gd'];
 
   for (const scriptName of scriptsToCopy) {
     fs.copyFileSync(
       path.join(__dirname, '..', 'src', 'scripts', scriptName),
-      path.join(__dirname, '..', 'build', 'scripts', scriptName)
+      path.join(buildScriptsDir, scriptName)
     );
   }
+
+  const runtimeBridgeScriptTemplate = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'scripts', 'runtime_bridge.gd'),
+    'utf8'
+  );
+  fs.writeFileSync(
+    path.join(buildScriptsDir, 'runtime_bridge.gd'),
+    runtimeBridgeScriptTemplate.replaceAll('__PACKAGE_VERSION__', packageVersion)
+  );
+
+  const runtimeBridgeManifestTemplate = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'scripts', 'runtime_bridge_manifest.json'),
+    'utf8'
+  );
+  fs.writeFileSync(
+    path.join(buildScriptsDir, 'runtime_bridge_manifest.json'),
+    runtimeBridgeManifestTemplate.replaceAll('__PACKAGE_VERSION__', packageVersion)
+  );
 
   console.log('Successfully copied Godot scripts to build/scripts');
 } catch (error) {
