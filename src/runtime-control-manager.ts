@@ -11,11 +11,21 @@ const RUNTIME_BRIDGE_SCRIPT = 'runtime_bridge.gd';
 const RUNTIME_BRIDGE_MANIFEST = 'bridge_manifest.json';
 const GENERATED_BRIDGE_MANIFEST = 'runtime_bridge_manifest.json';
 
+type RuntimeControlManagerOptions = {
+  runtimeBridgeAssetsDir?: string;
+};
+
 export class RuntimeControlManager {
-  private readonly runtimeBridgeAssetsDir = join(__dirname, '..', 'build', 'scripts');
-  private readonly runtimeBridgeScriptPath = join(this.runtimeBridgeAssetsDir, RUNTIME_BRIDGE_SCRIPT);
-  private readonly runtimeBridgeManifestPath = join(this.runtimeBridgeAssetsDir, GENERATED_BRIDGE_MANIFEST);
-  private readonly bridgeVersion = this.readGeneratedBridgeVersion();
+  private readonly runtimeBridgeAssetsDir: string;
+  private readonly runtimeBridgeScriptPath: string;
+  private readonly runtimeBridgeManifestPath: string;
+  private bridgeVersion: string | null = null;
+
+  constructor(options: RuntimeControlManagerOptions = {}) {
+    this.runtimeBridgeAssetsDir = options.runtimeBridgeAssetsDir ?? join(__dirname, '..', 'build', 'scripts');
+    this.runtimeBridgeScriptPath = join(this.runtimeBridgeAssetsDir, RUNTIME_BRIDGE_SCRIPT);
+    this.runtimeBridgeManifestPath = join(this.runtimeBridgeAssetsDir, GENERATED_BRIDGE_MANIFEST);
+  }
 
   getRuntimeState(): RuntimeState {
     return { connected: false, sessionId: null, scenePath: null };
@@ -45,7 +55,7 @@ export class RuntimeControlManager {
       return {
         installed: true,
         version,
-        compatible: version === this.bridgeVersion,
+        compatible: version === this.getGeneratedBridgeVersion(),
       };
     } catch {
       return { installed: true, version: null, compatible: false };
@@ -74,13 +84,18 @@ export class RuntimeControlManager {
     }
   }
 
-  private readGeneratedBridgeVersion(): string {
+  private getGeneratedBridgeVersion(): string {
+    if (this.bridgeVersion) {
+      return this.bridgeVersion;
+    }
+
     const manifest = JSON.parse(readFileSync(this.runtimeBridgeManifestPath, 'utf8')) as { version?: string };
 
     if (!manifest.version) {
       throw new Error(`Generated runtime bridge manifest is missing a version: ${this.runtimeBridgeManifestPath}`);
     }
 
-    return manifest.version;
+    this.bridgeVersion = manifest.version;
+    return this.bridgeVersion;
   }
 }
