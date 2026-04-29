@@ -125,6 +125,35 @@ describe('RuntimeControlManager', () => {
     });
   });
 
+  it('reports an installed but incompatible bridge when bridge_manifest.json is stale', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const staleVersion = '0.0.1-stale';
+    await mkdir(bridgeDir, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          name: 'godot_mcp_runtime',
+          version: staleVersion,
+          autoloadName: 'GodotMcpRuntimeBridge',
+          entryScript: 'runtime_bridge.gd',
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(
+      path.join(bridgeDir, 'runtime_bridge.gd'),
+      (await readFile(sourceBridgeScriptPath, 'utf8')).replaceAll('__PACKAGE_VERSION__', staleVersion)
+    );
+
+    expect(await manager.getBridgeStatus(projectPath)).toEqual({
+      installed: true,
+      version: staleVersion,
+      compatible: false,
+    });
+  });
+
   it('throws when generated bridge manifest metadata is invalid', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     await mkdir(bridgeDir, { recursive: true });
@@ -175,9 +204,9 @@ describe('RuntimeControlManager', () => {
     );
 
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    await manager.updateBridge(projectPath);
+    const status = await manager.updateBridge(projectPath);
 
-    expect(await manager.getBridgeStatus(projectPath)).toEqual(expect.objectContaining({
+    expect(status).toEqual(expect.objectContaining({
       installed: true,
       version: generatedVersion,
       compatible: true,

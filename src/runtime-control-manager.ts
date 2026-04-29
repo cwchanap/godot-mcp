@@ -51,10 +51,6 @@ export class RuntimeControlManager {
       this.pathExists(scriptPath),
     ]);
 
-    if (!manifestExists && !scriptExists) {
-      return { installed: false, version: null, compatible: false };
-    }
-
     if (!manifestExists || !scriptExists) {
       return { installed: false, version: null, compatible: false };
     }
@@ -76,8 +72,7 @@ export class RuntimeControlManager {
   }
 
   async updateBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
-    await this.installBridge(projectPath);
-    return this.getBridgeStatus(projectPath);
+    return this.installBridge(projectPath);
   }
 
   private getBridgeTargetDir(projectPath: string): string {
