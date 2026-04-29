@@ -1,4 +1,4 @@
-import { constants, readFileSync } from 'node:fs';
+import { accessSync, constants, readFileSync } from 'node:fs';
 import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -42,24 +42,37 @@ export class RuntimeControlManager {
   }
 
   async getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus> {
-    const manifestPath = join(this.getBridgeTargetDir(projectPath), RUNTIME_BRIDGE_MANIFEST);
+    const bridgeTargetDir = this.getBridgeTargetDir(projectPath);
+    const manifestPath = join(bridgeTargetDir, RUNTIME_BRIDGE_MANIFEST);
+    const scriptPath = join(bridgeTargetDir, RUNTIME_BRIDGE_SCRIPT);
 
-    if (!(await this.pathExists(manifestPath))) {
+    const [manifestExists, scriptExists] = await Promise.all([
+      this.pathExists(manifestPath),
+      this.pathExists(scriptPath),
+    ]);
+
+    if (!manifestExists && !scriptExists) {
       return { installed: false, version: null, compatible: false };
     }
 
+    if (!manifestExists || !scriptExists) {
+      return { installed: false, version: null, compatible: false };
+    }
+
+    let version: string | null;
+
     try {
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { version?: string };
-      const version = manifest.version ?? null;
-
-      return {
-        installed: true,
-        version,
-        compatible: version === this.getGeneratedBridgeVersion(),
-      };
+      version = manifest.version ?? null;
     } catch {
       return { installed: true, version: null, compatible: false };
     }
+
+    return {
+      installed: true,
+      version,
+      compatible: version === this.getGeneratedBridgeVersion(),
+    };
   }
 
   async updateBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -87,6 +100,12 @@ export class RuntimeControlManager {
   private getGeneratedBridgeVersion(): string {
     if (this.bridgeVersion) {
       return this.bridgeVersion;
+    }
+
+    try {
+      accessSync(this.runtimeBridgeScriptPath, constants.F_OK);
+    } catch {
+      throw new Error(`Generated runtime bridge script is missing: ${this.runtimeBridgeScriptPath}`);
     }
 
     const manifest = JSON.parse(readFileSync(this.runtimeBridgeManifestPath, 'utf8')) as { version?: string };
