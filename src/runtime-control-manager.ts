@@ -46,13 +46,33 @@ type RuntimeCommand =
     action: string;
   };
 
-const SUPPORTED_NODE_ACTIONS = new Map<string, string[]>([
-  ['BaseButton', ['press']],
+type RuntimeFindNodeResponse = {
+  ok?: boolean;
+  error?: string;
+  result?: {
+    found?: boolean;
+    nodePath?: string;
+    nodeType?: string;
+  };
+};
+
+const BUTTON_LIKE_NODE_TYPES = new Set([
+  'BaseButton',
+  'Button',
+  'CheckBox',
+  'CheckButton',
+  'ColorPickerButton',
+  'LinkButton',
+  'MenuButton',
+  'OptionButton',
+  'TextureButton',
 ]);
 
-const SUPPORTED_NODE_ACTION_SET = new Set(
-  Array.from(SUPPORTED_NODE_ACTIONS.values()).flat()
-);
+const SUPPORTED_NODE_ACTIONS = new Map<string, ReadonlySet<string>>([
+  ['press', BUTTON_LIKE_NODE_TYPES],
+]);
+
+const SUPPORTED_NODE_ACTION_SET = new Set(SUPPORTED_NODE_ACTIONS.keys());
 
 export class RuntimeControlManager {
   private readonly runtimeBridgeAssetsDir: string;
@@ -138,7 +158,9 @@ export class RuntimeControlManager {
   }
 
   async invokeNodeAction(nodePath: string, action: string): Promise<unknown> {
-    if (!this.isSupportedNodeAction(nodePath, action)) {
+    const nodeType = await this.resolveNodeType(nodePath, action);
+
+    if (!this.isSupportedNodeAction(nodeType, action)) {
       throw new Error(`Unsupported node action: ${action}`);
     }
 
@@ -348,13 +370,30 @@ export class RuntimeControlManager {
     }
   }
 
-  private isSupportedNodeAction(nodePath: string, action: string): boolean {
+  private async resolveNodeType(nodePath: string, action: string): Promise<string> {
+    if (!SUPPORTED_NODE_ACTION_SET.has(action)) {
+      throw new Error(`Unsupported node action: ${action}`);
+    }
+
+    const response = await this.findNode(nodePath) as RuntimeFindNodeResponse;
+
+    if (response.ok !== true) {
+      throw new Error(response.error ?? `Failed to resolve runtime node metadata for ${nodePath}`);
+    }
+
+    if (response.result?.found !== true || typeof response.result.nodeType !== 'string' || response.result.nodeType.length === 0) {
+      throw new Error(`Failed to resolve runtime node metadata for ${nodePath}`);
+    }
+
+    return response.result.nodeType;
+  }
+
+  private isSupportedNodeAction(nodeType: string, action: string): boolean {
     if (!SUPPORTED_NODE_ACTION_SET.has(action)) {
       return false;
     }
 
-    const nodeName = nodePath.split('/').filter(Boolean).pop() ?? '';
-    return /button/i.test(nodeName);
+    return SUPPORTED_NODE_ACTIONS.get(action)?.has(nodeType) ?? false;
   }
 
   private markDisconnected(): void {
