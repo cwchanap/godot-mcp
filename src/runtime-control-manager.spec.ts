@@ -104,6 +104,24 @@ describe('RuntimeControlManager', () => {
     expect(sendCommandMock).not.toHaveBeenCalled();
   });
 
+  it('marks the active session disconnected when command transport fails', async () => {
+    sendCommandMock.mockRejectedValue(new Error('socket closed'));
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.findNode('root/Menu/StartButton')).rejects.toThrow(/reconnect-required/i);
+    expect(manager.getRuntimeState()).toEqual({
+      connected: false,
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.changeScene('res://Other.tscn')).rejects.toThrow(/reconnect-required/i);
+    expect(sendCommandMock).toHaveBeenCalledTimes(1);
+  });
+
   it('installs the bridge addon into addons/godot_mcp_runtime', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     const status = await manager.installBridge(projectPath);
