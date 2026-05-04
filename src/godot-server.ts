@@ -13,7 +13,7 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { GodotServerConfig, RuntimeBridgeManager, RuntimeLaunchSession, RuntimeState } from './types.js';
+import type { GodotServerConfig, RuntimeBridgeManager, RuntimeState } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { OperationExecutor } from './operation-executor.js';
 import { ToolHandlers } from './tool-handlers.js';
@@ -23,6 +23,7 @@ type RuntimeToolManager = RuntimeBridgeManager & {
   getRuntimeState(): RuntimeState;
   findNode(nodePath: string): Promise<unknown>;
   changeScene(scenePath: string): Promise<unknown>;
+  invokeNodeAction(nodePath: string, action: string): Promise<unknown>;
 };
 
 // Derive __filename and __dirname in ESM
@@ -49,26 +50,7 @@ export class GodotServer {
     // Initialize operation executor
     this.operationExecutor = new OperationExecutor(operationsScriptPath);
 
-    const bridgeManager = new RuntimeControlManager();
-    let activeRuntimeSession: RuntimeLaunchSession | null = null;
-    let nextRuntimeSessionId = 1;
-    this.runtimeControlManager = Object.assign(bridgeManager, {
-      startSession: async (projectPath: string): Promise<RuntimeLaunchSession> => {
-        const sessionNumber = nextRuntimeSessionId++;
-        activeRuntimeSession = {
-          projectPath,
-          port: 4100,
-          token: `token-${sessionNumber}`,
-          sessionId: `session-${sessionNumber}`,
-        };
-        bridgeManager.setActiveSessionForTest(activeRuntimeSession.sessionId);
-        return activeRuntimeSession;
-      },
-      stopSession: async (): Promise<void> => {
-        activeRuntimeSession = null;
-        bridgeManager.setActiveSessionForTest(null);
-      },
-    }) as RuntimeToolManager;
+    this.runtimeControlManager = new RuntimeControlManager() as RuntimeToolManager;
 
     // Initialize tool handlers
     this.toolHandlers = new ToolHandlers(this.pathManager, this.operationExecutor, this.runtimeControlManager);
@@ -265,6 +247,24 @@ export class GodotServer {
               },
             },
             required: ['scenePath'],
+          },
+        },
+        {
+          name: 'invoke_node_action',
+          description: 'Invoke an allowlisted action on a node in the running Godot project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: {
+                type: 'string',
+                description: 'Scene tree path to the target node',
+              },
+              action: {
+                type: 'string',
+                description: 'Allowlisted action to invoke for the target node',
+              },
+            },
+            required: ['nodePath', 'action'],
           },
         },
         {
@@ -862,6 +862,8 @@ export class GodotServer {
           return await this.toolHandlers.handleFindNode(request.params.arguments);
         case 'change_scene':
           return await this.toolHandlers.handleChangeScene(request.params.arguments);
+        case 'invoke_node_action':
+          return await this.toolHandlers.handleInvokeNodeAction(request.params.arguments);
         case 'get_godot_version':
           return await this.toolHandlers.handleGetGodotVersion();
         case 'list_projects':

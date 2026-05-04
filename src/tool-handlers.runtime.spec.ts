@@ -213,7 +213,7 @@ describe('GodotServer runtime bridge management tools', () => {
 });
 
 describe('ToolHandlers runtime command delegation', () => {
-  it('delegates get_runtime_state, find_node, and change_scene to the runtime manager', async () => {
+  it('delegates get_runtime_state, find_node, change_scene, and invoke_node_action to the runtime manager', async () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
@@ -229,6 +229,13 @@ describe('ToolHandlers runtime command delegation', () => {
       changeScene: vi.fn().mockResolvedValue({
         ok: true,
         scenePath: 'res://Other.tscn',
+      }),
+      invokeNodeAction: vi.fn().mockResolvedValue({
+        ok: true,
+        result: {
+          nodePath: 'root/Menu/StartButton',
+          action: 'press',
+        },
       }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -265,10 +272,26 @@ describe('ToolHandlers runtime command delegation', () => {
         }, null, 2),
       }],
     });
+    await expect(handlers.handleInvokeNodeAction({
+      nodePath: 'root/Menu/StartButton',
+      action: 'press',
+    })).resolves.toEqual({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          ok: true,
+          result: {
+            nodePath: 'root/Menu/StartButton',
+            action: 'press',
+          },
+        }, null, 2),
+      }],
+    });
 
     expect(runtimeManager.getRuntimeState).toHaveBeenCalledTimes(1);
     expect(runtimeManager.findNode).toHaveBeenCalledWith('root/Menu/StartButton');
     expect(runtimeManager.changeScene).toHaveBeenCalledWith('res://Other.tscn');
+    expect(runtimeManager.invokeNodeAction).toHaveBeenCalledWith('root/Menu/StartButton', 'press');
   });
 });
 
@@ -288,6 +311,13 @@ describe('GodotServer runtime command tools', () => {
           required: ['scenePath'],
         }),
       }),
+      expect.objectContaining({
+        name: 'invoke_node_action',
+        description: 'Invoke an allowlisted action on a node in the running Godot project',
+        inputSchema: expect.objectContaining({
+          required: ['nodePath', 'action'],
+        }),
+      }),
     ]));
   });
 
@@ -303,15 +333,20 @@ describe('GodotServer runtime command tools', () => {
     const changeSceneResponse = {
       content: [{ type: 'text' as const, text: '{"ok":true,"scenePath":"res://Other.tscn"}' }],
     };
+    const invokeNodeActionResponse = {
+      content: [{ type: 'text' as const, text: '{"ok":true,"result":{"nodePath":"root/Menu/StartButton","action":"press"}}' }],
+    };
     const handleGetRuntimeState = vi.fn().mockResolvedValue(getRuntimeStateResponse);
     const handleFindNode = vi.fn().mockResolvedValue(findNodeResponse);
     const handleChangeScene = vi.fn().mockResolvedValue(changeSceneResponse);
+    const handleInvokeNodeAction = vi.fn().mockResolvedValue(invokeNodeActionResponse);
 
     (server as any).toolHandlers = {
       cleanup: originalToolHandlers.cleanup.bind(originalToolHandlers),
       handleGetRuntimeState,
       handleFindNode,
       handleChangeScene,
+      handleInvokeNodeAction,
     };
 
     await withConnectedClient(server, async (client) => {
@@ -327,11 +362,22 @@ describe('GodotServer runtime command tools', () => {
         name: 'change_scene',
         arguments: { scenePath: 'res://Other.tscn' },
       })).resolves.toEqual(changeSceneResponse);
+      await expect(client.callTool({
+        name: 'invoke_node_action',
+        arguments: {
+          nodePath: 'root/Menu/StartButton',
+          action: 'press',
+        },
+      })).resolves.toEqual(invokeNodeActionResponse);
     });
 
     expect(handleGetRuntimeState).toHaveBeenCalledWith();
     expect(handleFindNode).toHaveBeenCalledWith({ nodePath: 'root/Menu/StartButton' });
     expect(handleChangeScene).toHaveBeenCalledWith({ scenePath: 'res://Other.tscn' });
+    expect(handleInvokeNodeAction).toHaveBeenCalledWith({
+      nodePath: 'root/Menu/StartButton',
+      action: 'press',
+    });
   });
 });
 
