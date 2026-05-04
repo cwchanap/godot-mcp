@@ -169,6 +169,62 @@ export class GodotServer {
           },
         },
         {
+          name: 'install_runtime_bridge',
+          description: 'Install the managed runtime bridge into a Godot project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+            },
+            required: ['projectPath'],
+          },
+        },
+        {
+          name: 'get_runtime_bridge_status',
+          description: 'Inspect the managed runtime bridge installed in a Godot project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+            },
+            required: ['projectPath'],
+          },
+        },
+        {
+          name: 'update_runtime_bridge',
+          description: 'Update the managed runtime bridge in a Godot project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+            },
+            required: ['projectPath'],
+          },
+        },
+        {
+          name: 'uninstall_runtime_bridge',
+          description: 'Remove the managed runtime bridge from a Godot project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to the Godot project directory',
+              },
+            },
+            required: ['projectPath'],
+          },
+        },
+        {
           name: 'get_godot_version',
           description: 'Get the installed Godot version',
           inputSchema: {
@@ -749,6 +805,14 @@ export class GodotServer {
           return await this.toolHandlers.handleGetDebugOutput();
         case 'stop_project':
           return await this.toolHandlers.handleStopProject();
+        case 'install_runtime_bridge':
+          return await this.toolHandlers.handleInstallRuntimeBridge(request.params.arguments);
+        case 'get_runtime_bridge_status':
+          return await this.toolHandlers.handleGetRuntimeBridgeStatus(request.params.arguments);
+        case 'update_runtime_bridge':
+          return await this.toolHandlers.handleUpdateRuntimeBridge(request.params.arguments);
+        case 'uninstall_runtime_bridge':
+          return await this.toolHandlers.handleUninstallRuntimeBridge(request.params.arguments);
         case 'get_godot_version':
           return await this.toolHandlers.handleGetGodotVersion();
         case 'list_projects':

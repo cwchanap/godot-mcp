@@ -14,6 +14,25 @@ import { OperationExecutor } from './operation-executor.js';
 
 const execAsync = promisify(exec);
 
+type RuntimeBridgeManager = RuntimeControlSessionManager & {
+  installBridge(projectPath: string): Promise<{
+    installed: boolean;
+    version: string | null;
+    compatible: boolean;
+  }>;
+  getBridgeStatus(projectPath: string): Promise<{
+    installed: boolean;
+    version: string | null;
+    compatible: boolean;
+  }>;
+  updateBridge(projectPath: string): Promise<{
+    installed: boolean;
+    version: string | null;
+    compatible: boolean;
+  }>;
+  uninstallBridge(projectPath: string): Promise<void>;
+};
+
 interface OperationToolOptions {
   expectsJson?: boolean;
   successMessage?: string;
@@ -74,6 +93,10 @@ export class ToolHandlers {
     }
 
     return response;
+  }
+
+  private getRuntimeBridgeManager(): RuntimeBridgeManager {
+    return this.runtimeControlManager as RuntimeBridgeManager;
   }
 
   private extractJsonFromOutput(output: string): any {
@@ -389,6 +412,131 @@ export class ToolHandlers {
         },
       ],
     };
+  }
+
+  async handleInstallRuntimeBridge(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.projectPath) {
+      return this.createErrorResponse(
+        'Project path is required',
+        ['Provide a valid path to a Godot project directory']
+      );
+    }
+
+    if (!ProjectUtils.validatePath(args.projectPath)) {
+      return this.createErrorResponse(
+        'Invalid project path',
+        ['Provide a valid path without ".." or other potentially unsafe characters']
+      );
+    }
+
+    try {
+      const status = await this.getRuntimeBridgeManager().installBridge(args.projectPath);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to install runtime bridge: ${error?.message || 'Unknown error'}`,
+        ['Ensure the project path is accessible and contains a valid Godot project']
+      );
+    }
+  }
+
+  async handleGetRuntimeBridgeStatus(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.projectPath) {
+      return this.createErrorResponse(
+        'Project path is required',
+        ['Provide a valid path to a Godot project directory']
+      );
+    }
+
+    if (!ProjectUtils.validatePath(args.projectPath)) {
+      return this.createErrorResponse(
+        'Invalid project path',
+        ['Provide a valid path without ".." or other potentially unsafe characters']
+      );
+    }
+
+    try {
+      const status = await this.getRuntimeBridgeManager().getBridgeStatus(args.projectPath);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to get runtime bridge status: ${error?.message || 'Unknown error'}`,
+        ['Ensure the project path is accessible and contains a valid Godot project']
+      );
+    }
+  }
+
+  async handleUpdateRuntimeBridge(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.projectPath) {
+      return this.createErrorResponse(
+        'Project path is required',
+        ['Provide a valid path to a Godot project directory']
+      );
+    }
+
+    if (!ProjectUtils.validatePath(args.projectPath)) {
+      return this.createErrorResponse(
+        'Invalid project path',
+        ['Provide a valid path without ".." or other potentially unsafe characters']
+      );
+    }
+
+    try {
+      const status = await this.getRuntimeBridgeManager().updateBridge(args.projectPath);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to update runtime bridge: ${error?.message || 'Unknown error'}`,
+        ['Ensure the project path is accessible and contains a valid Godot project']
+      );
+    }
+  }
+
+  async handleUninstallRuntimeBridge(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.projectPath) {
+      return this.createErrorResponse(
+        'Project path is required',
+        ['Provide a valid path to a Godot project directory']
+      );
+    }
+
+    if (!ProjectUtils.validatePath(args.projectPath)) {
+      return this.createErrorResponse(
+        'Invalid project path',
+        ['Provide a valid path without ".." or other potentially unsafe characters']
+      );
+    }
+
+    try {
+      await this.getRuntimeBridgeManager().uninstallBridge(args.projectPath);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ message: 'Runtime bridge uninstalled' }, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to uninstall runtime bridge: ${error?.message || 'Unknown error'}`,
+        ['Ensure no managed runtime session is active for the project before uninstalling']
+      );
+    }
   }
 
   /**
