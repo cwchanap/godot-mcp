@@ -7,6 +7,7 @@ const projectPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control
 const generatedAssetsPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control-assets');
 const bridgeDir = path.join(projectPath, 'addons', 'godot_mcp_runtime');
 const manifestPath = path.join(bridgeDir, 'bridge_manifest.json');
+const projectFile = path.join(projectPath, 'project.godot');
 const sourceBridgeManifestPath = path.join(process.cwd(), 'src', 'scripts', 'runtime_bridge_manifest.json');
 const sourceBridgeScriptPath = path.join(process.cwd(), 'src', 'scripts', 'runtime_bridge.gd');
 const packageJsonPath = path.join(process.cwd(), 'package.json');
@@ -29,12 +30,30 @@ async function writeGeneratedBridgeAssets(version: string): Promise<void> {
 }
 
 describe('RuntimeControlManager', () => {
+  let manager: RuntimeControlManager;
+
+  beforeEach(() => {
+    manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+  });
+
+  it('registers the GodotMcpRuntimeBridge autoload entry during install', async () => {
+    await manager.installBridge(projectPath);
+    const projectContents = await readFile(projectFile, 'utf8');
+    expect(projectContents).toContain('autoload/GodotMcpRuntimeBridge=');
+  });
+
+  it('refuses uninstall while the bridge session is active', async () => {
+    manager.setActiveSessionForTest('session-1');
+    await expect(manager.uninstallBridge(projectPath)).rejects.toThrow(/running session/i);
+  });
+
   let bridgeVersion = '';
 
   beforeEach(async () => {
     await rm(projectPath, { recursive: true, force: true });
     await rm(generatedAssetsPath, { recursive: true, force: true });
     await mkdir(projectPath, { recursive: true });
+    await writeFile(projectFile, '[application]\nconfig/name="Runtime Control Test"\n');
     bridgeVersion = JSON.parse(await readFile(packageJsonPath, 'utf8')).version as string;
     await writeGeneratedBridgeAssets(bridgeVersion);
   });
@@ -61,6 +80,15 @@ describe('RuntimeControlManager', () => {
     expect(status.version).toBe(bridgeVersion);
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(bridgeVersion);
     await expect(readFile(manifestPath, 'utf8')).resolves.toContain(bridgeVersion);
+  });
+
+  it('registers the GodotMcpRuntimeBridge autoload entry during install', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+
+    await manager.installBridge(projectPath);
+
+    const projectContents = await readFile(projectFile, 'utf8');
+    expect(projectContents).toContain('autoload/GodotMcpRuntimeBridge=');
   });
 
   it('reads bridge status from bridge_manifest.json', async () => {
@@ -213,5 +241,21 @@ describe('RuntimeControlManager', () => {
     }));
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(generatedVersion);
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.not.toContain(staleVersion);
+  });
+
+  it('refuses uninstall while the bridge session is active', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    manager.setActiveSessionForTest('session-1');
+
+    await expect(manager.uninstallBridge(projectPath)).rejects.toThrow(/running session/i);
+  });
+
+  it('removes the owned autoload entry during uninstall', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await manager.installBridge(projectPath);
+
+    await manager.uninstallBridge(projectPath);
+
+    await expect(readFile(projectFile, 'utf8')).resolves.not.toContain('autoload/GodotMcpRuntimeBridge=');
   });
 });
