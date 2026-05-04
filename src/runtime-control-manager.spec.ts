@@ -11,6 +11,9 @@ const projectFile = path.join(projectPath, 'project.godot');
 const sourceBridgeManifestPath = path.join(process.cwd(), 'src', 'scripts', 'runtime_bridge_manifest.json');
 const sourceBridgeScriptPath = path.join(process.cwd(), 'src', 'scripts', 'runtime_bridge.gd');
 const packageJsonPath = path.join(process.cwd(), 'package.json');
+const runtimeBridgeAutoloadKey = 'autoload/GodotMcpRuntimeBridge=';
+const canonicalRuntimeBridgeAutoloadLine =
+  'autoload/GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
 
 async function writeGeneratedBridgeAssets(version: string): Promise<void> {
   const manifestTemplate = await readFile(sourceBridgeManifestPath, 'utf8');
@@ -81,7 +84,25 @@ describe('RuntimeControlManager', () => {
     await manager.installBridge(projectPath);
 
     const projectContents = await readFile(projectFile, 'utf8');
-    expect(projectContents).toContain('autoload/GodotMcpRuntimeBridge=');
+    expect(projectContents).toContain(runtimeBridgeAutoloadKey);
+  });
+
+  it('replaces existing bridge autoload variants with exactly one canonical entry during install', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await writeFile(
+      projectFile,
+      `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nautoload/GodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nautoload/OtherBridge="*res://addons/other/runtime_bridge.gd"\n`
+    );
+
+    await manager.installBridge(projectPath);
+
+    const projectContents = await readFile(projectFile, 'utf8');
+    const bridgeEntries = projectContents
+      .split('\n')
+      .filter((line) => line.startsWith(runtimeBridgeAutoloadKey));
+
+    expect(bridgeEntries).toEqual([canonicalRuntimeBridgeAutoloadLine]);
+    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
 
   it('reads bridge status from bridge_manifest.json', async () => {
@@ -249,6 +270,21 @@ describe('RuntimeControlManager', () => {
 
     await manager.uninstallBridge(projectPath);
 
-    await expect(readFile(projectFile, 'utf8')).resolves.not.toContain('autoload/GodotMcpRuntimeBridge=');
+    await expect(readFile(projectFile, 'utf8')).resolves.not.toContain(runtimeBridgeAutoloadKey);
+  });
+
+  it('removes owned bridge autoload variants during uninstall', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await writeFile(
+      projectFile,
+      `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nautoload/GodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nautoload/OtherBridge="*res://addons/other/runtime_bridge.gd"\n`
+    );
+
+    await manager.uninstallBridge(projectPath);
+
+    const projectContents = await readFile(projectFile, 'utf8');
+
+    expect(projectContents).not.toContain(runtimeBridgeAutoloadKey);
+    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
 });
