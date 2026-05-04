@@ -13,7 +13,7 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { GodotServerConfig, RuntimeControlSessionManager, RuntimeLaunchSession } from './types.js';
+import type { GodotServerConfig, RuntimeBridgeManager, RuntimeLaunchSession } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { OperationExecutor } from './operation-executor.js';
 import { ToolHandlers } from './tool-handlers.js';
@@ -28,7 +28,7 @@ export class GodotServer {
   private pathManager: GodotPathManager;
   private operationExecutor: OperationExecutor;
   private toolHandlers: ToolHandlers;
-  private runtimeControlManager: RuntimeControlSessionManager;
+  private runtimeControlManager: RuntimeBridgeManager;
 
   constructor(config?: GodotServerConfig) {
     // Initialize path manager

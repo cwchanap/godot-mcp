@@ -211,3 +211,53 @@ describe('GodotServer runtime bridge management tools', () => {
     expect(handleUninstallRuntimeBridge).toHaveBeenCalledWith({ projectPath });
   });
 });
+
+describe('ToolHandlers runtime bridge project validation', () => {
+  beforeEach(() => {
+    existsSyncMock.mockReset();
+    existsSyncMock.mockReturnValue(false);
+    spawnMock.mockReset();
+  });
+
+  it.each([
+    ['handleInstallRuntimeBridge', 'installBridge', 'Failed to install runtime bridge'],
+    ['handleGetRuntimeBridgeStatus', 'getBridgeStatus', 'Failed to get runtime bridge status'],
+    ['handleUpdateRuntimeBridge', 'updateBridge', 'Failed to update runtime bridge'],
+    ['handleUninstallRuntimeBridge', 'uninstallBridge', 'Failed to uninstall runtime bridge'],
+  ] as const)(
+    'rejects non-Godot projects in %s',
+    async (handlerName, managerMethodName, unexpectedMessage) => {
+      const runtimeManager = {
+        startSession: vi.fn(),
+        stopSession: vi.fn().mockResolvedValue(undefined),
+        installBridge: vi.fn(),
+        getBridgeStatus: vi.fn(),
+        updateBridge: vi.fn(),
+        uninstallBridge: vi.fn(),
+      };
+      const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+        { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+        { normalizeParameters: (args: unknown) => args },
+        runtimeManager
+      );
+
+      const result = await handlers[handlerName]({ projectPath });
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: 'text',
+            text: `Not a valid Godot project: ${projectPath}`,
+          },
+          {
+            type: 'text',
+            text: 'Possible solutions:\n- Ensure the path points to a directory containing a project.godot file\n- Use list_projects to find valid Godot projects',
+          },
+        ],
+        isError: true,
+      });
+      expect(runtimeManager[managerMethodName]).not.toHaveBeenCalled();
+      expect(result.content[0].text).not.toContain(unexpectedMessage);
+    }
+  );
+});

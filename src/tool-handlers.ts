@@ -7,31 +7,12 @@ import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import type { GodotProcess, RuntimeControlSessionManager } from './types.js';
+import type { GodotProcess, RuntimeBridgeManager } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { ProjectUtils } from './project-utils.js';
 import { OperationExecutor } from './operation-executor.js';
 
 const execAsync = promisify(exec);
-
-type RuntimeBridgeManager = RuntimeControlSessionManager & {
-  installBridge(projectPath: string): Promise<{
-    installed: boolean;
-    version: string | null;
-    compatible: boolean;
-  }>;
-  getBridgeStatus(projectPath: string): Promise<{
-    installed: boolean;
-    version: string | null;
-    compatible: boolean;
-  }>;
-  updateBridge(projectPath: string): Promise<{
-    installed: boolean;
-    version: string | null;
-    compatible: boolean;
-  }>;
-  uninstallBridge(projectPath: string): Promise<void>;
-};
 
 interface OperationToolOptions {
   expectsJson?: boolean;
@@ -44,12 +25,12 @@ export class ToolHandlers {
   private activeProcess: GodotProcess | null = null;
   private pathManager: GodotPathManager;
   private operationExecutor: OperationExecutor;
-  private runtimeControlManager: RuntimeControlSessionManager;
+  private runtimeControlManager: RuntimeBridgeManager;
 
   constructor(
     pathManager: GodotPathManager,
     operationExecutor: OperationExecutor,
-    runtimeControlManager: RuntimeControlSessionManager
+    runtimeControlManager: RuntimeBridgeManager
   ) {
     this.pathManager = pathManager;
     this.operationExecutor = operationExecutor;
@@ -93,10 +74,6 @@ export class ToolHandlers {
     }
 
     return response;
-  }
-
-  private getRuntimeBridgeManager(): RuntimeBridgeManager {
-    return this.runtimeControlManager as RuntimeBridgeManager;
   }
 
   private extractJsonFromOutput(output: string): any {
@@ -432,7 +409,17 @@ export class ToolHandlers {
     }
 
     try {
-      const status = await this.getRuntimeBridgeManager().installBridge(args.projectPath);
+      if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
+        return this.createErrorResponse(
+          `Not a valid Godot project: ${args.projectPath}`,
+          [
+            'Ensure the path points to a directory containing a project.godot file',
+            'Use list_projects to find valid Godot projects',
+          ]
+        );
+      }
+
+      const status = await this.runtimeControlManager.installBridge(args.projectPath);
       return {
         content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
       };
@@ -462,7 +449,17 @@ export class ToolHandlers {
     }
 
     try {
-      const status = await this.getRuntimeBridgeManager().getBridgeStatus(args.projectPath);
+      if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
+        return this.createErrorResponse(
+          `Not a valid Godot project: ${args.projectPath}`,
+          [
+            'Ensure the path points to a directory containing a project.godot file',
+            'Use list_projects to find valid Godot projects',
+          ]
+        );
+      }
+
+      const status = await this.runtimeControlManager.getBridgeStatus(args.projectPath);
       return {
         content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
       };
@@ -492,7 +489,17 @@ export class ToolHandlers {
     }
 
     try {
-      const status = await this.getRuntimeBridgeManager().updateBridge(args.projectPath);
+      if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
+        return this.createErrorResponse(
+          `Not a valid Godot project: ${args.projectPath}`,
+          [
+            'Ensure the path points to a directory containing a project.godot file',
+            'Use list_projects to find valid Godot projects',
+          ]
+        );
+      }
+
+      const status = await this.runtimeControlManager.updateBridge(args.projectPath);
       return {
         content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
       };
@@ -522,7 +529,17 @@ export class ToolHandlers {
     }
 
     try {
-      await this.getRuntimeBridgeManager().uninstallBridge(args.projectPath);
+      if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
+        return this.createErrorResponse(
+          `Not a valid Godot project: ${args.projectPath}`,
+          [
+            'Ensure the path points to a directory containing a project.godot file',
+            'Use list_projects to find valid Godot projects',
+          ]
+        );
+      }
+
+      await this.runtimeControlManager.uninstallBridge(args.projectPath);
       return {
         content: [
           {

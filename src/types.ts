@@ -101,6 +101,13 @@ export interface RuntimeControlSessionManager {
   stopSession(): Promise<void>;
 }
 
+export interface RuntimeBridgeManager extends RuntimeControlSessionManager {
+  installBridge(projectPath: string): Promise<RuntimeBridgeStatus>;
+  getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus>;
+  updateBridge(projectPath: string): Promise<RuntimeBridgeStatus>;
+  uninstallBridge(projectPath: string): Promise<void>;
+}
+
 export interface RuntimeBridgeStatus {
   installed: boolean;
   version: string | null;
