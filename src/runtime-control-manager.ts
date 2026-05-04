@@ -1,5 +1,5 @@
 import { accessSync, constants, readFileSync } from 'node:fs';
-import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { RuntimeBridgeStatus, RuntimeState } from './types.js';
@@ -10,6 +10,10 @@ const RUNTIME_BRIDGE_DIRNAME = 'godot_mcp_runtime';
 const RUNTIME_BRIDGE_SCRIPT = 'runtime_bridge.gd';
 const RUNTIME_BRIDGE_MANIFEST = 'bridge_manifest.json';
 const GENERATED_BRIDGE_MANIFEST = 'runtime_bridge_manifest.json';
+const GODOT_PROJECT_FILE = 'project.godot';
+const AUTOLOAD_SECTION_HEADER = '[autoload]';
+const RUNTIME_BRIDGE_AUTOLOAD_LINE =
+  'autoload/GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
 
 type RuntimeControlManagerOptions = {
   runtimeBridgeAssetsDir?: string;
@@ -20,6 +24,7 @@ export class RuntimeControlManager {
   private readonly runtimeBridgeScriptPath: string;
   private readonly runtimeBridgeManifestPath: string;
   private bridgeVersion: string | null = null;
+  private activeSessionId: string | null = null;
 
   constructor(options: RuntimeControlManagerOptions = {}) {
     this.runtimeBridgeAssetsDir = options.runtimeBridgeAssetsDir ?? join(__dirname, '..', 'build', 'scripts');
@@ -38,6 +43,7 @@ export class RuntimeControlManager {
       this.copyBridgeAsset(this.runtimeBridgeScriptPath, join(targetDir, RUNTIME_BRIDGE_SCRIPT)),
       this.copyBridgeAsset(this.runtimeBridgeManifestPath, join(targetDir, RUNTIME_BRIDGE_MANIFEST)),
     ]);
+    await this.updateProjectAutoload(projectPath, (projectText) => this.ensureAutoloadSection(projectText));
     return this.getBridgeStatus(projectPath);
   }
 
@@ -75,12 +81,54 @@ export class RuntimeControlManager {
     return this.installBridge(projectPath);
   }
 
+  async uninstallBridge(projectPath: string): Promise<void> {
+    if (this.activeSessionId) {
+      throw new Error('Cannot uninstall runtime bridge while a running session is active.');
+    }
+
+    await rm(this.getBridgeTargetDir(projectPath), { recursive: true, force: true });
+    await this.updateProjectAutoload(projectPath, (projectText) => this.removeOwnedAutoload(projectText));
+  }
+
+  setActiveSessionForTest(sessionId: string | null): void {
+    this.activeSessionId = sessionId;
+  }
+
   private getBridgeTargetDir(projectPath: string): string {
     return join(projectPath, 'addons', RUNTIME_BRIDGE_DIRNAME);
   }
 
   private async copyBridgeAsset(sourcePath: string, destinationPath: string): Promise<void> {
     await copyFile(sourcePath, destinationPath);
+  }
+
+  private async updateProjectAutoload(projectPath: string, update: (projectText: string) => string): Promise<void> {
+    const projectFilePath = join(projectPath, GODOT_PROJECT_FILE);
+    const projectText = await readFile(projectFilePath, 'utf8');
+    const updatedProjectText = update(projectText);
+
+    if (updatedProjectText !== projectText) {
+      await writeFile(projectFilePath, updatedProjectText);
+    }
+  }
+
+  private ensureAutoloadSection(projectText: string): string {
+    if (!projectText.includes(AUTOLOAD_SECTION_HEADER)) {
+      return `${projectText.trim()}\n\n${AUTOLOAD_SECTION_HEADER}\n${RUNTIME_BRIDGE_AUTOLOAD_LINE}\n`;
+    }
+
+    if (projectText.includes(RUNTIME_BRIDGE_AUTOLOAD_LINE)) {
+      return projectText;
+    }
+
+    return projectText.replace(AUTOLOAD_SECTION_HEADER, `${AUTOLOAD_SECTION_HEADER}\n${RUNTIME_BRIDGE_AUTOLOAD_LINE}`);
+  }
+
+  private removeOwnedAutoload(projectText: string): string {
+    return projectText
+      .split('\n')
+      .filter((line) => line.trim() !== RUNTIME_BRIDGE_AUTOLOAD_LINE)
+      .join('\n');
   }
 
   private async pathExists(targetPath: string): Promise<boolean> {
