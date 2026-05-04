@@ -349,13 +349,21 @@ export class ToolHandlers {
    */
   async handleStopProject() {
     if (!this.activeProcess) {
-      return this.createErrorResponse(
-        'No active Godot process to stop.',
-        [
-          'Use run_project to start a Godot project first',
-          'The process may have already terminated',
-        ]
-      );
+      await this.runtimeControlManager.stopSession();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                message: 'No active Godot process to stop. Runtime session cleaned up.'
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
     }
 
     this.logDebug('Stopping active Godot process');

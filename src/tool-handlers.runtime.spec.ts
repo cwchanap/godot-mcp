@@ -96,4 +96,20 @@ describe('ToolHandlers runtime launch plumbing', () => {
       expect.anything()
     );
   });
+
+  it('calls stopSession even if no active Godot process', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+    // No process started, so activeProcess is null
+    const result = await handlers.handleStopProject();
+    expect(runtimeManager.stopSession).toHaveBeenCalled();
+    expect(result.content[0].text).toMatch(/Runtime session cleaned up/);
+  });
 });
