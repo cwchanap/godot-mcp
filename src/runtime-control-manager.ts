@@ -150,11 +150,7 @@ export class RuntimeControlManager {
   }
 
   setDisconnectedForTest(): void {
-    this.connectionStatus = this.runtimeState.sessionId ? 'disconnected' : 'idle';
-    this.runtimeState = {
-      ...this.runtimeState,
-      connected: false,
-    };
+    this.markDisconnected();
   }
 
   private getBridgeTargetDir(projectPath: string): string {
@@ -265,6 +261,19 @@ export class RuntimeControlManager {
       throw new Error('Runtime bridge not connected.');
     }
 
-    return this.commandSender(command);
+    try {
+      return await this.commandSender(command);
+    } catch {
+      this.markDisconnected();
+      throw new Error('Runtime bridge reconnect-required.');
+    }
+  }
+
+  private markDisconnected(): void {
+    this.connectionStatus = this.runtimeState.sessionId ? 'disconnected' : 'idle';
+    this.runtimeState = {
+      ...this.runtimeState,
+      connected: false,
+    };
   }
 }
