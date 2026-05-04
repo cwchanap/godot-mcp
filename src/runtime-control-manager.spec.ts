@@ -1,6 +1,6 @@
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuntimeControlManager } from './runtime-control-manager.js';
 
 const projectPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control-project');
@@ -34,9 +34,14 @@ async function writeGeneratedBridgeAssets(version: string): Promise<void> {
 
 describe('RuntimeControlManager', () => {
   let manager: RuntimeControlManager;
+  const sendCommandMock = vi.fn();
 
   beforeEach(() => {
-    manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    sendCommandMock.mockReset();
+    manager = new RuntimeControlManager({
+      runtimeBridgeAssetsDir: generatedAssetsPath,
+      sendCommand: sendCommandMock,
+    });
   });
 
   
@@ -66,6 +71,37 @@ describe('RuntimeControlManager', () => {
       sessionId: null,
       scenePath: null,
     });
+  });
+
+  it('returns a disconnected error when change_scene is called without a connected bridge', async () => {
+    await expect(manager.changeScene('res://Main.tscn')).rejects.toThrow(/not connected/i);
+    expect(sendCommandMock).not.toHaveBeenCalled();
+  });
+
+  it('routes find_node to the active bridge session', async () => {
+    sendCommandMock.mockResolvedValue({ nodePath: 'root/Menu/StartButton', found: true });
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await manager.findNode('root/Menu/StartButton');
+
+    expect(sendCommandMock).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'find_node',
+      nodePath: 'root/Menu/StartButton',
+    }));
+  });
+
+  it('returns a reconnect-required error after the active socket disconnects', async () => {
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+    manager.setDisconnectedForTest();
+
+    await expect(manager.findNode('root/Menu/StartButton')).rejects.toThrow(/reconnect-required/i);
+    expect(sendCommandMock).not.toHaveBeenCalled();
   });
 
   it('installs the bridge addon into addons/godot_mcp_runtime', async () => {

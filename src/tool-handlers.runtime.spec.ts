@@ -212,6 +212,129 @@ describe('GodotServer runtime bridge management tools', () => {
   });
 });
 
+describe('ToolHandlers runtime command delegation', () => {
+  it('delegates get_runtime_state, find_node, and change_scene to the runtime manager', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      getRuntimeState: vi.fn().mockReturnValue({
+        connected: true,
+        sessionId: 'session-1',
+        scenePath: 'res://Main.tscn',
+      }),
+      findNode: vi.fn().mockResolvedValue({
+        found: true,
+        nodePath: 'root/Menu/StartButton',
+      }),
+      changeScene: vi.fn().mockResolvedValue({
+        ok: true,
+        scenePath: 'res://Other.tscn',
+      }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    await expect(handlers.handleGetRuntimeState()).resolves.toEqual({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          connected: true,
+          sessionId: 'session-1',
+          scenePath: 'res://Main.tscn',
+        }, null, 2),
+      }],
+    });
+    await expect(handlers.handleFindNode({ nodePath: 'root/Menu/StartButton' })).resolves.toEqual({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          found: true,
+          nodePath: 'root/Menu/StartButton',
+        }, null, 2),
+      }],
+    });
+    await expect(handlers.handleChangeScene({ scenePath: 'res://Other.tscn' })).resolves.toEqual({
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          ok: true,
+          scenePath: 'res://Other.tscn',
+        }, null, 2),
+      }],
+    });
+
+    expect(runtimeManager.getRuntimeState).toHaveBeenCalledTimes(1);
+    expect(runtimeManager.findNode).toHaveBeenCalledWith('root/Menu/StartButton');
+    expect(runtimeManager.changeScene).toHaveBeenCalledWith('res://Other.tscn');
+  });
+});
+
+describe('GodotServer runtime command tools', () => {
+  it('registers runtime state and scene tools', async () => {
+    const server = new GodotServer();
+
+    const tools = await listTools(server);
+
+    expect(tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'get_runtime_state' }),
+      expect.objectContaining({ name: 'find_node' }),
+      expect.objectContaining({
+        name: 'change_scene',
+        description: 'Request a scene transition in the running Godot project',
+        inputSchema: expect.objectContaining({
+          required: ['scenePath'],
+        }),
+      }),
+    ]));
+  });
+
+  it('delegates runtime command tool calls to tool handlers', async () => {
+    const server = new GodotServer();
+    const originalToolHandlers = (server as any).toolHandlers;
+    const getRuntimeStateResponse = {
+      content: [{ type: 'text' as const, text: '{"connected":true,"sessionId":"session-1","scenePath":"res://Main.tscn"}' }],
+    };
+    const findNodeResponse = {
+      content: [{ type: 'text' as const, text: '{"found":true,"nodePath":"root/Menu/StartButton"}' }],
+    };
+    const changeSceneResponse = {
+      content: [{ type: 'text' as const, text: '{"ok":true,"scenePath":"res://Other.tscn"}' }],
+    };
+    const handleGetRuntimeState = vi.fn().mockResolvedValue(getRuntimeStateResponse);
+    const handleFindNode = vi.fn().mockResolvedValue(findNodeResponse);
+    const handleChangeScene = vi.fn().mockResolvedValue(changeSceneResponse);
+
+    (server as any).toolHandlers = {
+      cleanup: originalToolHandlers.cleanup.bind(originalToolHandlers),
+      handleGetRuntimeState,
+      handleFindNode,
+      handleChangeScene,
+    };
+
+    await withConnectedClient(server, async (client) => {
+      await expect(client.callTool({
+        name: 'get_runtime_state',
+        arguments: {},
+      })).resolves.toEqual(getRuntimeStateResponse);
+      await expect(client.callTool({
+        name: 'find_node',
+        arguments: { nodePath: 'root/Menu/StartButton' },
+      })).resolves.toEqual(findNodeResponse);
+      await expect(client.callTool({
+        name: 'change_scene',
+        arguments: { scenePath: 'res://Other.tscn' },
+      })).resolves.toEqual(changeSceneResponse);
+    });
+
+    expect(handleGetRuntimeState).toHaveBeenCalledWith();
+    expect(handleFindNode).toHaveBeenCalledWith({ nodePath: 'root/Menu/StartButton' });
+    expect(handleChangeScene).toHaveBeenCalledWith({ scenePath: 'res://Other.tscn' });
+  });
+});
+
 describe('ToolHandlers runtime bridge project validation', () => {
   beforeEach(() => {
     existsSyncMock.mockReset();
