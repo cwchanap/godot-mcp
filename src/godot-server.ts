@@ -13,10 +13,11 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { GodotServerConfig } from './types.js';
+import type { GodotServerConfig, RuntimeControlSessionManager, RuntimeLaunchSession } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { OperationExecutor } from './operation-executor.js';
 import { ToolHandlers } from './tool-handlers.js';
+import { RuntimeControlManager } from './runtime-control-manager.js';
 
 // Derive __filename and __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +28,7 @@ export class GodotServer {
   private pathManager: GodotPathManager;
   private operationExecutor: OperationExecutor;
   private toolHandlers: ToolHandlers;
+  private runtimeControlManager: RuntimeControlSessionManager;
 
   constructor(config?: GodotServerConfig) {
     // Initialize path manager
@@ -41,8 +43,29 @@ export class GodotServer {
     // Initialize operation executor
     this.operationExecutor = new OperationExecutor(operationsScriptPath);
 
+    const bridgeManager = new RuntimeControlManager();
+    let activeRuntimeSession: RuntimeLaunchSession | null = null;
+    let nextRuntimeSessionId = 1;
+    this.runtimeControlManager = Object.assign(bridgeManager, {
+      startSession: async (projectPath: string): Promise<RuntimeLaunchSession> => {
+        const sessionNumber = nextRuntimeSessionId++;
+        activeRuntimeSession = {
+          projectPath,
+          port: 4100,
+          token: `token-${sessionNumber}`,
+          sessionId: `session-${sessionNumber}`,
+        };
+        bridgeManager.setActiveSessionForTest(activeRuntimeSession.sessionId);
+        return activeRuntimeSession;
+      },
+      stopSession: async (): Promise<void> => {
+        activeRuntimeSession = null;
+        bridgeManager.setActiveSessionForTest(null);
+      },
+    });
+
     // Initialize tool handlers
-    this.toolHandlers = new ToolHandlers(this.pathManager, this.operationExecutor);
+    this.toolHandlers = new ToolHandlers(this.pathManager, this.operationExecutor, this.runtimeControlManager);
 
     // Initialize the MCP server
     this.server = new Server(
@@ -64,9 +87,11 @@ export class GodotServer {
     this.server.onerror = (error) => console.error('[MCP Error]', error);
 
     // Cleanup on exit
-    process.on('SIGINT', async () => {
-      await this.cleanup();
-      process.exit(0);
+    process.on('SIGINT', () => {
+      void this.cleanup();
+    });
+    process.on('SIGTERM', () => {
+      void this.cleanup();
     });
   }
 
@@ -115,6 +140,11 @@ export class GodotServer {
               scene: {
                 type: 'string',
                 description: 'Optional: Specific scene to run',
+              },
+              runtimeControl: {
+                type: 'boolean',
+                description: 'Enable managed runtime bridge control for the launched project.',
+                default: false,
               },
             },
             required: ['projectPath'],
