@@ -13,11 +13,17 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { GodotServerConfig, RuntimeBridgeManager, RuntimeLaunchSession } from './types.js';
+import type { GodotServerConfig, RuntimeBridgeManager, RuntimeLaunchSession, RuntimeState } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { OperationExecutor } from './operation-executor.js';
 import { ToolHandlers } from './tool-handlers.js';
 import { RuntimeControlManager } from './runtime-control-manager.js';
+
+type RuntimeToolManager = RuntimeBridgeManager & {
+  getRuntimeState(): RuntimeState;
+  findNode(nodePath: string): Promise<unknown>;
+  changeScene(scenePath: string): Promise<unknown>;
+};
 
 // Derive __filename and __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +34,7 @@ export class GodotServer {
   private pathManager: GodotPathManager;
   private operationExecutor: OperationExecutor;
   private toolHandlers: ToolHandlers;
-  private runtimeControlManager: RuntimeBridgeManager;
+  private runtimeControlManager: RuntimeToolManager;
 
   constructor(config?: GodotServerConfig) {
     // Initialize path manager
@@ -62,7 +68,7 @@ export class GodotServer {
         activeRuntimeSession = null;
         bridgeManager.setActiveSessionForTest(null);
       },
-    });
+    }) as RuntimeToolManager;
 
     // Initialize tool handlers
     this.toolHandlers = new ToolHandlers(this.pathManager, this.operationExecutor, this.runtimeControlManager);
@@ -222,6 +228,43 @@ export class GodotServer {
               },
             },
             required: ['projectPath'],
+          },
+        },
+        {
+          name: 'get_runtime_state',
+          description: 'Get the current state of the managed runtime bridge session',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: 'find_node',
+          description: 'Find a node in the active running Godot scene tree',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: {
+                type: 'string',
+                description: 'Scene tree path to resolve in the running project',
+              },
+            },
+            required: ['nodePath'],
+          },
+        },
+        {
+          name: 'change_scene',
+          description: 'Request a scene transition in the running Godot project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              scenePath: {
+                type: 'string',
+                description: 'Scene path to load in the running project',
+              },
+            },
+            required: ['scenePath'],
           },
         },
         {
@@ -813,6 +856,12 @@ export class GodotServer {
           return await this.toolHandlers.handleUpdateRuntimeBridge(request.params.arguments);
         case 'uninstall_runtime_bridge':
           return await this.toolHandlers.handleUninstallRuntimeBridge(request.params.arguments);
+        case 'get_runtime_state':
+          return await this.toolHandlers.handleGetRuntimeState();
+        case 'find_node':
+          return await this.toolHandlers.handleFindNode(request.params.arguments);
+        case 'change_scene':
+          return await this.toolHandlers.handleChangeScene(request.params.arguments);
         case 'get_godot_version':
           return await this.toolHandlers.handleGetGodotVersion();
         case 'list_projects':

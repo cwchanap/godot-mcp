@@ -7,7 +7,7 @@ import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import type { GodotProcess, RuntimeBridgeManager } from './types.js';
+import type { GodotProcess, RuntimeBridgeManager, RuntimeState } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { ProjectUtils } from './project-utils.js';
 import { OperationExecutor } from './operation-executor.js';
@@ -21,16 +21,22 @@ interface OperationToolOptions {
   possibleErrorSolutions?: string[];
 }
 
+type RuntimeToolManager = RuntimeBridgeManager & {
+  getRuntimeState(): RuntimeState;
+  findNode(nodePath: string): Promise<unknown>;
+  changeScene(scenePath: string): Promise<unknown>;
+};
+
 export class ToolHandlers {
   private activeProcess: GodotProcess | null = null;
   private pathManager: GodotPathManager;
   private operationExecutor: OperationExecutor;
-  private runtimeControlManager: RuntimeBridgeManager;
+  private runtimeControlManager: RuntimeToolManager;
 
   constructor(
     pathManager: GodotPathManager,
     operationExecutor: OperationExecutor,
-    runtimeControlManager: RuntimeBridgeManager
+    runtimeControlManager: RuntimeToolManager
   ) {
     this.pathManager = pathManager;
     this.operationExecutor = operationExecutor;
@@ -552,6 +558,69 @@ export class ToolHandlers {
       return this.createErrorResponse(
         `Failed to uninstall runtime bridge: ${error?.message || 'Unknown error'}`,
         ['Ensure no managed runtime session is active for the project before uninstalling']
+      );
+    }
+  }
+
+  async handleGetRuntimeState() {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(this.runtimeControlManager.getRuntimeState(), null, 2),
+        },
+      ],
+    };
+  }
+
+  async handleFindNode(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.nodePath) {
+      return this.createErrorResponse(
+        'Node path is required',
+        ['Provide a valid node path in the running scene tree']
+      );
+    }
+
+    try {
+      const result = await this.runtimeControlManager.findNode(args.nodePath);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to find runtime node: ${error?.message || 'Unknown error'}`,
+        [
+          'Start the project with runtime control enabled',
+          'Reconnect the runtime bridge if the running project restarted',
+        ]
+      );
+    }
+  }
+
+  async handleChangeScene(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.scenePath) {
+      return this.createErrorResponse(
+        'Scene path is required',
+        ['Provide a valid Godot scene path such as res://Main.tscn']
+      );
+    }
+
+    try {
+      const result = await this.runtimeControlManager.changeScene(args.scenePath);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to change runtime scene: ${error?.message || 'Unknown error'}`,
+        [
+          'Start the project with runtime control enabled',
+          'Reconnect the runtime bridge if the running project restarted',
+        ]
       );
     }
   }

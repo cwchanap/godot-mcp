@@ -18,23 +18,52 @@ const RUNTIME_BRIDGE_AUTOLOAD_LINE =
 
 type RuntimeControlManagerOptions = {
   runtimeBridgeAssetsDir?: string;
+  sendCommand?: (command: RuntimeCommand) => Promise<unknown>;
 };
+
+type RuntimeConnectionStatus = 'idle' | 'pending' | 'connected' | 'disconnected';
+
+type RuntimeCommand =
+  | {
+    command: 'find_node';
+    nodePath: string;
+  }
+  | {
+    command: 'change_scene';
+    scenePath: string;
+  };
 
 export class RuntimeControlManager {
   private readonly runtimeBridgeAssetsDir: string;
   private readonly runtimeBridgeScriptPath: string;
   private readonly runtimeBridgeManifestPath: string;
+  private readonly commandSender: (command: RuntimeCommand) => Promise<unknown>;
   private bridgeVersion: string | null = null;
   private activeSessionId: string | null = null;
+  private runtimeState: RuntimeState = { connected: false, sessionId: null, scenePath: null };
+  private connectionStatus: RuntimeConnectionStatus = 'idle';
 
   constructor(options: RuntimeControlManagerOptions = {}) {
     this.runtimeBridgeAssetsDir = options.runtimeBridgeAssetsDir ?? join(__dirname, '..', 'build', 'scripts');
     this.runtimeBridgeScriptPath = join(this.runtimeBridgeAssetsDir, RUNTIME_BRIDGE_SCRIPT);
     this.runtimeBridgeManifestPath = join(this.runtimeBridgeAssetsDir, GENERATED_BRIDGE_MANIFEST);
+    this.commandSender = options.sendCommand ?? (async () => {
+      throw new Error('Runtime bridge command transport unavailable.');
+    });
   }
 
   getRuntimeState(): RuntimeState {
-    return { connected: false, sessionId: null, scenePath: null };
+    return { ...this.runtimeState };
+  }
+
+  async findNode(nodePath: string): Promise<unknown> {
+    return this.sendCommand({ command: 'find_node', nodePath });
+  }
+
+  async changeScene(scenePath: string): Promise<unknown> {
+    const response = await this.sendCommand({ command: 'change_scene', scenePath });
+    this.runtimeState = { ...this.runtimeState, scenePath };
+    return response;
   }
 
   async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -93,6 +122,39 @@ export class RuntimeControlManager {
 
   setActiveSessionForTest(sessionId: string | null): void {
     this.activeSessionId = sessionId;
+
+    if (sessionId === null) {
+      this.connectionStatus = 'idle';
+      this.runtimeState = { connected: false, sessionId: null, scenePath: null };
+      return;
+    }
+
+    if (this.runtimeState.sessionId !== sessionId) {
+      this.connectionStatus = 'pending';
+      this.runtimeState = {
+        connected: false,
+        sessionId,
+        scenePath: null,
+      };
+    }
+  }
+
+  setConnectedSessionForTest(session: { sessionId: string; scenePath: string | null }): void {
+    this.activeSessionId = session.sessionId;
+    this.connectionStatus = 'connected';
+    this.runtimeState = {
+      connected: true,
+      sessionId: session.sessionId,
+      scenePath: session.scenePath,
+    };
+  }
+
+  setDisconnectedForTest(): void {
+    this.connectionStatus = this.runtimeState.sessionId ? 'disconnected' : 'idle';
+    this.runtimeState = {
+      ...this.runtimeState,
+      connected: false,
+    };
   }
 
   private getBridgeTargetDir(projectPath: string): string {
@@ -188,5 +250,21 @@ export class RuntimeControlManager {
 
     this.bridgeVersion = manifest.version;
     return this.bridgeVersion;
+  }
+
+  private async sendCommand(command: RuntimeCommand): Promise<unknown> {
+    if (!this.runtimeState.sessionId) {
+      throw new Error('Runtime bridge not connected.');
+    }
+
+    if (this.connectionStatus === 'disconnected' || !this.runtimeState.connected) {
+      if (this.connectionStatus === 'disconnected') {
+        throw new Error('Runtime bridge reconnect-required.');
+      }
+
+      throw new Error('Runtime bridge not connected.');
+    }
+
+    return this.commandSender(command);
   }
 }
