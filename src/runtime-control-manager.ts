@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { accessSync, constants, readFileSync } from 'node:fs';
 import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'path';
+import { createServer, type Server, type Socket } from 'node:net';
+import { dirname, join, normalize, parse, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import type { RuntimeBridgeStatus, RuntimeLaunchSession, RuntimeState } from './types.js';
 
@@ -31,6 +33,11 @@ type RuntimeHandshakeRequest = {
   scenePath?: string | null;
 };
 
+type RuntimeBridgeMessage = Record<string, unknown> & {
+  command?: string;
+  requestId?: string;
+};
+
 type RuntimeCommand =
   | {
     command: 'find_node';
@@ -54,6 +61,29 @@ type RuntimeFindNodeResponse = {
     nodePath?: string;
     nodeType?: string;
   };
+};
+
+type RuntimeChangeSceneResponse = {
+  ok?: boolean;
+  error?: string;
+  result?: {
+    scenePath?: string;
+  };
+};
+
+type RuntimePendingRequest = {
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+};
+
+type ActiveRuntimeSession = RuntimeLaunchSession & {
+  expectedProjectPath: string;
+  server: Server;
+  socket: Socket | null;
+  receiveBuffer: string;
+  pendingRequests: Map<string, RuntimePendingRequest>;
+  nextRequestNumber: number;
+  connected: boolean;
 };
 
 const BUTTON_LIKE_NODE_TYPES = new Set([
@@ -81,7 +111,7 @@ export class RuntimeControlManager {
   private readonly commandSender: (command: RuntimeCommand) => Promise<unknown>;
   private bridgeVersion: string | null = null;
   private nextSessionNumber = 1;
-  private activeRuntimeSession: RuntimeLaunchSession | null = null;
+  private activeRuntimeSession: ActiveRuntimeSession | null = null;
   private activeSessionId: string | null = null;
   private runtimeState: RuntimeState = { connected: false, sessionId: null, scenePath: null };
   private connectionStatus: RuntimeConnectionStatus = 'idle';
@@ -90,9 +120,7 @@ export class RuntimeControlManager {
     this.runtimeBridgeAssetsDir = options.runtimeBridgeAssetsDir ?? join(__dirname, '..', 'build', 'scripts');
     this.runtimeBridgeScriptPath = join(this.runtimeBridgeAssetsDir, RUNTIME_BRIDGE_SCRIPT);
     this.runtimeBridgeManifestPath = join(this.runtimeBridgeAssetsDir, GENERATED_BRIDGE_MANIFEST);
-    this.commandSender = options.sendCommand ?? (async () => {
-      throw new Error('Runtime bridge command transport unavailable.');
-    });
+    this.commandSender = options.sendCommand ?? ((command) => this.sendCommandOverSocket(command));
   }
 
   getRuntimeState(): RuntimeState {
@@ -100,21 +128,53 @@ export class RuntimeControlManager {
   }
 
   async startSession(projectPath: string): Promise<RuntimeLaunchSession> {
+    await this.stopSession();
+
     const sessionNumber = this.nextSessionNumber++;
-    const session = {
+    const server = createServer((socket) => this.handleBridgeConnection(socket));
+    await this.listen(server);
+    const address = server.address();
+
+    if (!address || typeof address === 'string') {
+      await this.closeServer(server);
+      throw new Error('Failed to create runtime bridge listener.');
+    }
+
+    const session: ActiveRuntimeSession = {
       projectPath,
-      port: 4100,
-      token: `token-${sessionNumber}`,
+      expectedProjectPath: this.normalizeProjectPath(projectPath),
+      port: address.port,
+      token: randomUUID(),
       sessionId: `session-${sessionNumber}`,
+      server,
+      socket: null,
+      receiveBuffer: '',
+      pendingRequests: new Map(),
+      nextRequestNumber: 1,
+      connected: false,
     };
 
     this.activeRuntimeSession = session;
     this.setActiveSessionForTest(session.sessionId);
-    return session;
+
+    return {
+      projectPath: session.projectPath,
+      port: session.port,
+      token: session.token,
+      sessionId: session.sessionId,
+    };
   }
 
   async stopSession(): Promise<void> {
+    const session = this.activeRuntimeSession;
     this.activeRuntimeSession = null;
+
+    if (session) {
+      this.clearPendingRequests(session, new Error('Runtime session stopped.'));
+      session.socket?.destroy();
+      await this.closeServer(session.server);
+    }
+
     this.setActiveSessionForTest(null);
   }
 
@@ -131,7 +191,7 @@ export class RuntimeControlManager {
       throw new Error('Bridge version mismatch');
     }
 
-    if (payload.projectPath !== this.activeRuntimeSession.projectPath) {
+    if (this.normalizeProjectPath(payload.projectPath) !== this.activeRuntimeSession.expectedProjectPath) {
       throw new Error('Bridge connected for the wrong project');
     }
 
@@ -140,6 +200,7 @@ export class RuntimeControlManager {
     }
 
     this.connectionStatus = 'connected';
+    this.activeRuntimeSession.connected = true;
     this.runtimeState = {
       connected: true,
       sessionId: payload.sessionId,
@@ -152,8 +213,10 @@ export class RuntimeControlManager {
   }
 
   async changeScene(scenePath: string): Promise<unknown> {
-    const response = await this.sendCommand({ command: 'change_scene', scenePath });
-    this.runtimeState = { ...this.runtimeState, scenePath };
+    const response = await this.sendCommand({ command: 'change_scene', scenePath }) as RuntimeChangeSceneResponse;
+    if (response?.ok === true) {
+      this.runtimeState = { ...this.runtimeState, scenePath };
+    }
     return response;
   }
 
@@ -370,6 +433,33 @@ export class RuntimeControlManager {
     }
   }
 
+  private async sendCommandOverSocket(command: RuntimeCommand): Promise<unknown> {
+    const session = this.activeRuntimeSession;
+    const socket = session?.socket;
+
+    if (!session || !socket || socket.destroyed) {
+      throw new Error('Runtime bridge command transport unavailable.');
+    }
+
+    const requestId = `${session.sessionId}:${session.nextRequestNumber++}`;
+
+    return new Promise<unknown>((resolveRequest, rejectRequest) => {
+      session.pendingRequests.set(requestId, {
+        resolve: resolveRequest,
+        reject: rejectRequest,
+      });
+
+      void this.sendSocketMessage(socket, {
+        requestId,
+        ...command,
+      }).catch((error) => {
+        if (session.pendingRequests.delete(requestId)) {
+          rejectRequest(error);
+        }
+      });
+    });
+  }
+
   private async resolveNodeType(nodePath: string, action: string): Promise<string> {
     if (!SUPPORTED_NODE_ACTION_SET.has(action)) {
       throw new Error(`Unsupported node action: ${action}`);
@@ -377,7 +467,7 @@ export class RuntimeControlManager {
 
     const response = await this.findNode(nodePath) as RuntimeFindNodeResponse;
 
-    if (response.ok !== true) {
+    if (!response || response.ok !== true) {
       throw new Error(response.error ?? `Failed to resolve runtime node metadata for ${nodePath}`);
     }
 
@@ -397,10 +487,189 @@ export class RuntimeControlManager {
   }
 
   private markDisconnected(): void {
+    if (this.activeRuntimeSession) {
+      this.activeRuntimeSession.connected = false;
+    }
     this.connectionStatus = this.runtimeState.sessionId ? 'disconnected' : 'idle';
     this.runtimeState = {
       ...this.runtimeState,
       connected: false,
     };
+  }
+
+  private handleBridgeConnection(socket: Socket): void {
+    const session = this.activeRuntimeSession;
+
+    if (!session) {
+      socket.destroy();
+      return;
+    }
+
+    if (session.socket && !session.socket.destroyed) {
+      socket.destroy();
+      return;
+    }
+
+    session.socket = socket;
+    session.receiveBuffer = '';
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk) => this.handleSocketData(session, socket, chunk));
+    socket.on('error', () => undefined);
+    socket.on('close', () => this.handleSocketClose(session, socket));
+  }
+
+  private handleSocketData(session: ActiveRuntimeSession, socket: Socket, chunk: string | Buffer): void {
+    if (this.activeRuntimeSession !== session || session.socket !== socket) {
+      return;
+    }
+
+    session.receiveBuffer += chunk.toString();
+    let newlineIndex = session.receiveBuffer.indexOf('\n');
+
+    while (newlineIndex !== -1) {
+      const rawMessage = session.receiveBuffer.slice(0, newlineIndex).trim();
+      session.receiveBuffer = session.receiveBuffer.slice(newlineIndex + 1);
+
+      if (rawMessage.length > 0) {
+        let message: RuntimeBridgeMessage;
+
+        try {
+          message = JSON.parse(rawMessage) as RuntimeBridgeMessage;
+        } catch {
+          this.runSocketTask(this.sendSocketMessage(socket, { ok: false, error: 'Invalid message' }));
+          newlineIndex = session.receiveBuffer.indexOf('\n');
+          continue;
+        }
+
+        this.runSocketTask(this.handleBridgeMessage(session, socket, message));
+      }
+
+      newlineIndex = session.receiveBuffer.indexOf('\n');
+    }
+  }
+
+  private async handleBridgeMessage(
+    session: ActiveRuntimeSession,
+    socket: Socket,
+    message: RuntimeBridgeMessage
+  ): Promise<void> {
+    if (message.command === 'hello') {
+      try {
+        await this.acceptHandshake({
+          token: typeof message.token === 'string' ? message.token : '',
+          version: typeof message.version === 'string' ? message.version : '',
+          sessionId: typeof message.sessionId === 'string' ? message.sessionId : '',
+          projectPath: typeof message.projectPath === 'string' ? message.projectPath : '',
+          scenePath: typeof message.scenePath === 'string' ? message.scenePath : null,
+        });
+        await this.sendSocketMessage(socket, { ok: true });
+      } catch (error) {
+        await this.sendSocketMessage(socket, {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Handshake failed',
+        });
+        socket.end();
+      }
+      return;
+    }
+
+    if (typeof message.requestId === 'string') {
+      const pendingRequest = session.pendingRequests.get(message.requestId);
+      if (!pendingRequest) {
+        return;
+      }
+
+      session.pendingRequests.delete(message.requestId);
+      const { requestId: _requestId, ...responsePayload } = message;
+      pendingRequest.resolve(responsePayload);
+      return;
+    }
+
+    await this.sendSocketMessage(socket, { ok: false, error: 'Unsupported message' });
+  }
+
+  private handleSocketClose(session: ActiveRuntimeSession, socket: Socket): void {
+    if (this.activeRuntimeSession !== session || session.socket !== socket) {
+      return;
+    }
+
+    const wasConnected = session.connected;
+    session.socket = null;
+    session.receiveBuffer = '';
+    session.connected = false;
+    this.clearPendingRequests(session, new Error('socket closed'));
+
+    if (wasConnected) {
+      this.markDisconnected();
+    }
+  }
+
+  private clearPendingRequests(session: ActiveRuntimeSession, error: Error): void {
+    for (const pendingRequest of session.pendingRequests.values()) {
+      pendingRequest.reject(error);
+    }
+    session.pendingRequests.clear();
+  }
+
+  private async sendSocketMessage(socket: Socket, message: Record<string, unknown>): Promise<void> {
+    await new Promise<void>((resolveMessage, rejectMessage) => {
+      socket.write(`${JSON.stringify(message)}\n`, (error) => {
+        if (error) {
+          rejectMessage(error);
+          return;
+        }
+
+        resolveMessage();
+      });
+    });
+  }
+
+  private async listen(server: Server): Promise<void> {
+    await new Promise<void>((resolveListen, rejectListen) => {
+      const onError = (error: Error) => {
+        server.off('listening', onListening);
+        rejectListen(error);
+      };
+
+      const onListening = () => {
+        server.off('error', onError);
+        resolveListen();
+      };
+
+      server.once('error', onError);
+      server.once('listening', onListening);
+      server.listen(0, '127.0.0.1');
+    });
+  }
+
+  private async closeServer(server: Server): Promise<void> {
+    if (!server.listening) {
+      return;
+    }
+
+    await new Promise<void>((resolveClose, rejectClose) => {
+      server.close((error) => {
+        if (error) {
+          rejectClose(error);
+          return;
+        }
+
+        resolveClose();
+      });
+    });
+  }
+
+  private normalizeProjectPath(projectPath: string): string {
+    const normalizedPath = normalize(resolve(projectPath));
+    const root = parse(normalizedPath).root;
+    const trimmedPath = normalizedPath.length > root.length
+      ? normalizedPath.replace(/[\\/]+$/, '')
+      : normalizedPath;
+
+    return process.platform === 'win32' ? trimmedPath.toLowerCase() : trimmedPath;
+  }
+
+  private runSocketTask(task: Promise<void>): void {
+    void task.catch(() => undefined);
   }
 }

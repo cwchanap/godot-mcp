@@ -98,6 +98,9 @@ func _handle_raw_message(raw_message: String) -> void:
         return
 
     var message := parsed as Dictionary
+    if not message.has("command"):
+        return
+
     var response := _handle_command(message)
     if message.has("requestId"):
         response["requestId"] = message["requestId"]
