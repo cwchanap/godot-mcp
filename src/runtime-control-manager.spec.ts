@@ -287,4 +287,42 @@ describe('RuntimeControlManager', () => {
     expect(projectContents).not.toContain(runtimeBridgeAutoloadKey);
     expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
-});
+
+  it('preserves later config sections (e.g. [editor_plugins]) after [autoload] during install and uninstall', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const initialProjectGodot = `
+[application]
+config/name="Runtime Control Test"
+
+[autoload]
+autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"
+
+[editor_plugins]
+plugin_list={"MyPlugin":true}
+`;
+    await writeFile(projectFile, initialProjectGodot);
+
+    // Install bridge
+    await manager.installBridge(projectPath);
+    let projectContents = await readFile(projectFile, 'utf8');
+    // [editor_plugins] section and its contents must be preserved
+    expect(projectContents).toContain('[editor_plugins]');
+    expect(projectContents).toContain('plugin_list={"MyPlugin":true}');
+    // The bridge autoload must be present
+    expect(projectContents).toContain(runtimeBridgeAutoloadKey);
+    // The other autoload must be present
+    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
+
+    // Uninstall bridge
+    await manager.uninstallBridge(projectPath);
+    projectContents = await readFile(projectFile, 'utf8');
+    // [editor_plugins] section and its contents must still be preserved
+    expect(projectContents).toContain('[editor_plugins]');
+    expect(projectContents).toContain('plugin_list={"MyPlugin":true}');
+    // The bridge autoload must be gone
+    expect(projectContents).not.toContain(runtimeBridgeAutoloadKey);
+    // The other autoload must still be present
+    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
+  });
+}
+);
