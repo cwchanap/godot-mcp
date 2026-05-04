@@ -1,4 +1,6 @@
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { once } from 'node:events';
+import { Socket, createConnection } from 'node:net';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuntimeControlManager } from './runtime-control-manager.js';
@@ -14,6 +16,90 @@ const packageJsonPath = path.join(process.cwd(), 'package.json');
 const runtimeBridgeAutoloadKey = 'autoload/GodotMcpRuntimeBridge=';
 const canonicalRuntimeBridgeAutoloadLine =
   'autoload/GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
+const socketBuffers = new WeakMap<Socket, string>();
+
+async function connectBridgeClient(port: number): Promise<Socket> {
+  const socket = createConnection({ host: '127.0.0.1', port });
+  socket.setEncoding('utf8');
+  await once(socket, 'connect');
+  return socket;
+}
+
+async function closeBridgeClient(socket: Socket): Promise<void> {
+  if (socket.destroyed) {
+    return;
+  }
+
+  socket.end();
+  await once(socket, 'close').catch(() => undefined);
+}
+
+async function writeJsonLine(socket: Socket, message: Record<string, unknown>): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    socket.write(`${JSON.stringify(message)}\n`, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function readJsonLine(socket: Socket): Promise<Record<string, unknown>> {
+  const consumeBufferedLine = (): Record<string, unknown> | null => {
+    const buffer = socketBuffers.get(socket) ?? '';
+    const newlineIndex = buffer.indexOf('\n');
+
+    if (newlineIndex === -1) {
+      return null;
+    }
+
+    const line = buffer.slice(0, newlineIndex).trim();
+    socketBuffers.set(socket, buffer.slice(newlineIndex + 1));
+    return JSON.parse(line) as Record<string, unknown>;
+  };
+
+  const bufferedLine = consumeBufferedLine();
+  if (bufferedLine) {
+    return bufferedLine;
+  }
+
+  return new Promise<Record<string, unknown>>((resolve, reject) => {
+    const onData = (chunk: string | Buffer) => {
+      const nextBuffer = `${socketBuffers.get(socket) ?? ''}${chunk.toString()}`;
+      socketBuffers.set(socket, nextBuffer);
+      const parsed = consumeBufferedLine();
+      if (!parsed) {
+        return;
+      }
+
+      cleanup();
+      resolve(parsed);
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const onClose = () => {
+      cleanup();
+      reject(new Error('Socket closed before a complete JSON message was received.'));
+    };
+
+    const cleanup = () => {
+      socket.off('data', onData);
+      socket.off('error', onError);
+      socket.off('close', onClose);
+    };
+
+    socket.on('data', onData);
+    socket.on('error', onError);
+    socket.on('close', onClose);
+  });
+}
 
 async function writeGeneratedBridgeAssets(version: string): Promise<void> {
   const manifestTemplate = await readFile(sourceBridgeManifestPath, 'utf8');
@@ -71,6 +157,292 @@ describe('RuntimeControlManager', () => {
       sessionId: null,
       scenePath: null,
     });
+  });
+
+  it('starts a real local runtime session with a listening port and token', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const relativeProjectPath = path.relative(process.cwd(), projectPath);
+    const session = await realManager.startSession(relativeProjectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      expect(session.port).toBeGreaterThan(0);
+      expect(session.token).not.toHaveLength(0);
+      expect(session.sessionId).toMatch(/^session-/);
+      expect(realManager.getRuntimeState()).toEqual({
+        connected: false,
+        sessionId: session.sessionId,
+        scenePath: null,
+      });
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
+  it('marks the session connected after a successful hello handshake with normalized project paths', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const relativeProjectPath = path.relative(process.cwd(), projectPath);
+    const session = await realManager.startSession(relativeProjectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath: `${projectPath}${path.sep}`,
+        scenePath: 'res://Main.tscn',
+      });
+
+      await expect(readJsonLine(socket)).resolves.toMatchObject({ ok: true });
+      await vi.waitFor(() => {
+        expect(realManager.getRuntimeState()).toEqual({
+          connected: true,
+          sessionId: session.sessionId,
+          scenePath: 'res://Main.tscn',
+        });
+      });
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
+  it('rejects hello handshakes for a different project path after normalization', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const relativeProjectPath = path.relative(process.cwd(), projectPath);
+    const session = await realManager.startSession(relativeProjectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath: path.join(path.dirname(projectPath), 'other-project'),
+      });
+
+      await expect(readJsonLine(socket)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringMatching(/wrong project/i),
+      });
+      expect(realManager.getRuntimeState()).toEqual({
+        connected: false,
+        sessionId: session.sessionId,
+        scenePath: null,
+      });
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
+  it('keeps the session in a pre-connect state after a rejected hello handshake', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await realManager.startSession(projectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath: `${projectPath}-other`,
+      });
+
+      await expect(readJsonLine(socket)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringMatching(/wrong project/i),
+      });
+      await once(socket, 'close');
+
+      await expect(realManager.changeScene('res://Other.tscn')).rejects.toThrow(/not connected/i);
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
+  it('routes find_node requests over the real socket transport', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await realManager.startSession(projectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath,
+        scenePath: 'res://Main.tscn',
+      });
+      await readJsonLine(socket);
+
+      const findNodePromise = realManager.findNode('root/Menu/StartButton');
+      const request = await readJsonLine(socket);
+      expect(request).toMatchObject({
+        command: 'find_node',
+        nodePath: 'root/Menu/StartButton',
+        requestId: expect.any(String),
+      });
+      await writeJsonLine(socket, {
+        requestId: request.requestId,
+        ok: true,
+        result: {
+          found: true,
+          nodePath: 'root/Menu/StartButton',
+          nodeType: 'Button',
+        },
+      });
+
+      await expect(findNodePromise).resolves.toEqual({
+        ok: true,
+        result: {
+          found: true,
+          nodePath: 'root/Menu/StartButton',
+          nodeType: 'Button',
+        },
+      });
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
+  it('routes change_scene requests over the real socket transport', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await realManager.startSession(projectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath,
+        scenePath: 'res://Main.tscn',
+      });
+      await readJsonLine(socket);
+
+      const changeScenePromise = realManager.changeScene('res://Other.tscn');
+      const request = await readJsonLine(socket);
+      expect(request).toMatchObject({
+        command: 'change_scene',
+        scenePath: 'res://Other.tscn',
+        requestId: expect.any(String),
+      });
+      await writeJsonLine(socket, {
+        requestId: request.requestId,
+        ok: true,
+        result: {
+          scenePath: 'res://Other.tscn',
+        },
+      });
+
+      await expect(changeScenePromise).resolves.toEqual({
+        ok: true,
+        result: {
+          scenePath: 'res://Other.tscn',
+        },
+      });
+      expect(realManager.getRuntimeState()).toEqual({
+        connected: true,
+        sessionId: session.sessionId,
+        scenePath: 'res://Other.tscn',
+      });
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
+  it('does not update runtime state when change_scene reports failure', async () => {
+    sendCommandMock.mockResolvedValue({
+      ok: false,
+      error: 'Scene load failed',
+    });
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.changeScene('res://Other.tscn')).resolves.toEqual({
+      ok: false,
+      error: 'Scene load failed',
+    });
+    expect(manager.getRuntimeState()).toEqual({
+      connected: true,
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+  });
+
+  it('routes invoke_node_action requests over the real socket transport', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await realManager.startSession(projectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath,
+        scenePath: 'res://Main.tscn',
+      });
+      await readJsonLine(socket);
+
+      const actionPromise = realManager.invokeNodeAction('root/Menu/StartButton', 'press');
+      const findRequest = await readJsonLine(socket);
+      expect(findRequest).toMatchObject({
+        command: 'find_node',
+        nodePath: 'root/Menu/StartButton',
+        requestId: expect.any(String),
+      });
+      await writeJsonLine(socket, {
+        requestId: findRequest.requestId,
+        ok: true,
+        result: {
+          found: true,
+          nodePath: 'root/Menu/StartButton',
+          nodeType: 'Button',
+        },
+      });
+
+      const actionRequest = await readJsonLine(socket);
+      expect(actionRequest).toMatchObject({
+        command: 'invoke_node_action',
+        nodePath: 'root/Menu/StartButton',
+        action: 'press',
+        requestId: expect.any(String),
+      });
+      await writeJsonLine(socket, {
+        requestId: actionRequest.requestId,
+        ok: true,
+        result: {
+          nodePath: 'root/Menu/StartButton',
+          action: 'press',
+        },
+      });
+
+      await expect(actionPromise).resolves.toEqual({
+        ok: true,
+        result: {
+          nodePath: 'root/Menu/StartButton',
+          action: 'press',
+        },
+      });
+    } finally {
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
   });
 
   it('returns a disconnected error when change_scene is called without a connected bridge', async () => {
