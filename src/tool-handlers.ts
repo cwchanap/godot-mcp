@@ -7,7 +7,7 @@ import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { GodotProcess } from './types.js';
+import type { GodotProcess, RuntimeControlSessionManager } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { ProjectUtils } from './project-utils.js';
 import { OperationExecutor } from './operation-executor.js';
@@ -25,10 +25,16 @@ export class ToolHandlers {
   private activeProcess: GodotProcess | null = null;
   private pathManager: GodotPathManager;
   private operationExecutor: OperationExecutor;
+  private runtimeControlManager: RuntimeControlSessionManager;
 
-  constructor(pathManager: GodotPathManager, operationExecutor: OperationExecutor) {
+  constructor(
+    pathManager: GodotPathManager,
+    operationExecutor: OperationExecutor,
+    runtimeControlManager: RuntimeControlSessionManager
+  ) {
     this.pathManager = pathManager;
     this.operationExecutor = operationExecutor;
+    this.runtimeControlManager = runtimeControlManager;
   }
 
   /**
@@ -98,6 +104,7 @@ export class ToolHandlers {
    */
   async cleanup(): Promise<void> {
     this.logDebug('Cleaning up resources');
+    await this.runtimeControlManager.stopSession();
     if (this.activeProcess) {
       this.logDebug('Killing active Godot process');
       this.activeProcess.process.kill();
@@ -217,16 +224,32 @@ export class ToolHandlers {
         );
       }
 
+      const shouldStartRuntimeControl = args.runtimeControl === true;
+
       // Kill any existing process
       if (this.activeProcess) {
         this.logDebug('Killing existing Godot process before starting a new one');
         this.activeProcess.process.kill();
+        await this.runtimeControlManager.stopSession();
       }
 
       const cmdArgs = ['-d', '--path', args.projectPath];
       if (args.scene && ProjectUtils.validatePath(args.scene)) {
         this.logDebug(`Adding scene parameter: ${args.scene}`);
         cmdArgs.push(args.scene);
+      }
+
+      if (shouldStartRuntimeControl) {
+        const session = await this.runtimeControlManager.startSession(args.projectPath);
+        cmdArgs.push(
+          '--',
+          '--godot-mcp-port',
+          String(session.port),
+          '--godot-mcp-token',
+          session.token,
+          '--godot-mcp-session',
+          session.sessionId
+        );
       }
 
       this.logDebug(`Running Godot project: ${args.projectPath}`);
@@ -254,6 +277,7 @@ export class ToolHandlers {
         this.logDebug(`Godot process exited with code ${code}`);
         if (this.activeProcess && this.activeProcess.process === process) {
           this.activeProcess = null;
+          void this.runtimeControlManager.stopSession();
         }
       });
 
@@ -261,6 +285,7 @@ export class ToolHandlers {
         console.error('Failed to start Godot process:', err);
         if (this.activeProcess && this.activeProcess.process === process) {
           this.activeProcess = null;
+          void this.runtimeControlManager.stopSession();
         }
       });
 
@@ -275,6 +300,7 @@ export class ToolHandlers {
         ],
       };
     } catch (error: unknown) {
+      await this.runtimeControlManager.stopSession();
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResponse(
         `Failed to run Godot project: ${errorMessage}`,
@@ -337,6 +363,7 @@ export class ToolHandlers {
     const output = this.activeProcess.output;
     const errors = this.activeProcess.errors;
     this.activeProcess = null;
+    await this.runtimeControlManager.stopSession();
 
     return {
       content: [

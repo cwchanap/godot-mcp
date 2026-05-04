@@ -33,6 +33,7 @@ export interface OperationParams {
  */
 export const PARAMETER_MAPPINGS: Record<string, string> = {
   'project_path': 'projectPath',
+  'runtime_control': 'runtimeControl',
   'scene_path': 'scenePath',
   'root_node_type': 'rootNodeType',
   'parent_node_path': 'parentNodePath',
@@ -86,6 +87,18 @@ export interface RuntimeState {
   connected: boolean;
   sessionId: string | null;
   scenePath: string | null;
+}
+
+export interface RuntimeLaunchSession {
+  projectPath: string;
+  port: number;
+  token: string;
+  sessionId: string;
+}
+
+export interface RuntimeControlSessionManager {
+  startSession(projectPath: string): Promise<RuntimeLaunchSession>;
+  stopSession(): Promise<void>;
 }
 
 export interface RuntimeBridgeStatus {
