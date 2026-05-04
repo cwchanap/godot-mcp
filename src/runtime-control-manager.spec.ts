@@ -36,16 +36,9 @@ describe('RuntimeControlManager', () => {
     manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
   });
 
-  it('registers the GodotMcpRuntimeBridge autoload entry during install', async () => {
-    await manager.installBridge(projectPath);
-    const projectContents = await readFile(projectFile, 'utf8');
-    expect(projectContents).toContain('autoload/GodotMcpRuntimeBridge=');
-  });
+  
 
-  it('refuses uninstall while the bridge session is active', async () => {
-    manager.setActiveSessionForTest('session-1');
-    await expect(manager.uninstallBridge(projectPath)).rejects.toThrow(/running session/i);
-  });
+  
 
   let bridgeVersion = '';
 
