@@ -87,8 +87,8 @@ export class RuntimeControlManager {
       throw new Error('Cannot uninstall runtime bridge while a running session is active.');
     }
 
-    await rm(this.getBridgeTargetDir(projectPath), { recursive: true, force: true });
     await this.updateProjectAutoload(projectPath, (projectText) => this.removeOwnedAutoload(projectText));
+    await rm(this.getBridgeTargetDir(projectPath), { recursive: true, force: true });
   }
 
   setActiveSessionForTest(sessionId: string | null): void {
