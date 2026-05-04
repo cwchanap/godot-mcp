@@ -93,22 +93,13 @@ describe('RuntimeControlManager', () => {
     }));
   });
 
-  it('rejects unsupported node actions before dispatch', async () => {
-    manager.setConnectedSessionForTest({
-      sessionId: 'session-1',
-      scenePath: 'res://Main.tscn',
-    });
-
-    await expect(manager.invokeNodeAction('root/Menu/Label', 'press')).rejects.toThrow(/unsupported/i);
-    expect(sendCommandMock).not.toHaveBeenCalled();
-  });
-
-  it('routes button press actions to the connected bridge session', async () => {
+  it('rejects press actions for resolved non-button node types before dispatch', async () => {
     sendCommandMock.mockResolvedValue({
       ok: true,
       result: {
+        found: true,
         nodePath: 'root/Menu/StartButton',
-        action: 'press',
+        nodeType: 'Label',
       },
     });
     manager.setConnectedSessionForTest({
@@ -116,9 +107,43 @@ describe('RuntimeControlManager', () => {
       scenePath: 'res://Main.tscn',
     });
 
+    await expect(manager.invokeNodeAction('root/Menu/StartButton', 'press')).rejects.toThrow(/unsupported/i);
+    expect(sendCommandMock).toHaveBeenCalledTimes(1);
+    expect(sendCommandMock).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'find_node',
+      nodePath: 'root/Menu/StartButton',
+    }));
+  });
+
+  it('routes button press actions to the connected bridge session', async () => {
+    sendCommandMock
+      .mockResolvedValueOnce({
+        ok: true,
+        result: {
+          found: true,
+          nodePath: 'root/Menu/StartButton',
+          nodeType: 'Button',
+        },
+      })
+      .mockResolvedValueOnce({
+      ok: true,
+      result: {
+        nodePath: 'root/Menu/StartButton',
+        action: 'press',
+      },
+      });
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
     await manager.invokeNodeAction('root/Menu/StartButton', 'press');
 
-    expect(sendCommandMock).toHaveBeenCalledWith(expect.objectContaining({
+    expect(sendCommandMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      command: 'find_node',
+      nodePath: 'root/Menu/StartButton',
+    }));
+    expect(sendCommandMock).toHaveBeenNthCalledWith(2, expect.objectContaining({
       command: 'invoke_node_action',
       nodePath: 'root/Menu/StartButton',
       action: 'press',
@@ -145,6 +170,17 @@ describe('RuntimeControlManager', () => {
       sessionId: session.sessionId,
       projectPath,
     })).rejects.toThrow(/version mismatch/i);
+  });
+
+  it('rejects handshakes for the wrong project path', async () => {
+    const session = await manager.startSession(projectPath);
+
+    await expect(manager.acceptHandshake({
+      token: session.token,
+      version: bridgeVersion,
+      sessionId: session.sessionId,
+      projectPath: `${projectPath}-other`,
+    })).rejects.toThrow(/wrong project/i);
   });
 
   it('returns a reconnect-required error after the active socket disconnects', async () => {
