@@ -12,6 +12,7 @@ const RUNTIME_BRIDGE_MANIFEST = 'bridge_manifest.json';
 const GENERATED_BRIDGE_MANIFEST = 'runtime_bridge_manifest.json';
 const GODOT_PROJECT_FILE = 'project.godot';
 const AUTOLOAD_SECTION_HEADER = '[autoload]';
+const RUNTIME_BRIDGE_AUTOLOAD_KEY = 'autoload/GodotMcpRuntimeBridge=';
 const RUNTIME_BRIDGE_AUTOLOAD_LINE =
   'autoload/GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
 
@@ -117,18 +118,46 @@ export class RuntimeControlManager {
       return `${projectText.trim()}\n\n${AUTOLOAD_SECTION_HEADER}\n${RUNTIME_BRIDGE_AUTOLOAD_LINE}\n`;
     }
 
-    if (projectText.includes(RUNTIME_BRIDGE_AUTOLOAD_LINE)) {
-      return projectText;
-    }
-
-    return projectText.replace(AUTOLOAD_SECTION_HEADER, `${AUTOLOAD_SECTION_HEADER}\n${RUNTIME_BRIDGE_AUTOLOAD_LINE}`);
+    return this.updateAutoloadSection(projectText, (autoloadLines) => [
+      RUNTIME_BRIDGE_AUTOLOAD_LINE,
+      ...autoloadLines.filter((line) => !this.isOwnedAutoloadLine(line)),
+    ]);
   }
 
   private removeOwnedAutoload(projectText: string): string {
-    return projectText
-      .split('\n')
-      .filter((line) => line.trim() !== RUNTIME_BRIDGE_AUTOLOAD_LINE)
-      .join('\n');
+    if (!projectText.includes(AUTOLOAD_SECTION_HEADER)) {
+      return projectText;
+    }
+
+    return this.updateAutoloadSection(projectText, (autoloadLines) =>
+      autoloadLines.filter((line) => !this.isOwnedAutoloadLine(line))
+    );
+  }
+
+  private updateAutoloadSection(projectText: string, update: (autoloadLines: string[]) => string[]): string {
+    const lines = projectText.split('\n');
+    const autoloadIndex = lines.findIndex((line) => line.trim() === AUTOLOAD_SECTION_HEADER);
+
+    if (autoloadIndex === -1) {
+      return projectText;
+    }
+
+    const autoloadEndIndex = lines.findIndex(
+      (line, index) => index > autoloadIndex && line.startsWith('[') && line.endsWith(']')
+    );
+    const autoloadLines = lines.slice(autoloadIndex + 1, autoloadEndIndex === -1 ? undefined : autoloadEndIndex);
+    const updatedAutoloadLines = update(autoloadLines);
+    const updatedLines = [
+      ...lines.slice(0, autoloadIndex + 1),
+      ...updatedAutoloadLines,
+      ...(autoloadEndIndex === -1 ? [] : lines.slice(autoloadEndIndex)),
+    ];
+
+    return projectText.endsWith('\n') ? `${updatedLines.join('\n')}\n` : updatedLines.join('\n');
+  }
+
+  private isOwnedAutoloadLine(line: string): boolean {
+    return line.trim().startsWith(RUNTIME_BRIDGE_AUTOLOAD_KEY);
   }
 
   private async pathExists(targetPath: string): Promise<boolean> {
