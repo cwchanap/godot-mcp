@@ -2,7 +2,7 @@ import { accessSync, constants, readFileSync } from 'node:fs';
 import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import type { RuntimeBridgeStatus, RuntimeState } from './types.js';
+import type { RuntimeBridgeStatus, RuntimeLaunchSession, RuntimeState } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,6 +23,14 @@ type RuntimeControlManagerOptions = {
 
 type RuntimeConnectionStatus = 'idle' | 'pending' | 'connected' | 'disconnected';
 
+type RuntimeHandshakeRequest = {
+  token: string;
+  version: string;
+  sessionId: string;
+  projectPath: string;
+  scenePath?: string | null;
+};
+
 type RuntimeCommand =
   | {
     command: 'find_node';
@@ -31,7 +39,20 @@ type RuntimeCommand =
   | {
     command: 'change_scene';
     scenePath: string;
+  }
+  | {
+    command: 'invoke_node_action';
+    nodePath: string;
+    action: string;
   };
+
+const SUPPORTED_NODE_ACTIONS = new Map<string, string[]>([
+  ['BaseButton', ['press']],
+]);
+
+const SUPPORTED_NODE_ACTION_SET = new Set(
+  Array.from(SUPPORTED_NODE_ACTIONS.values()).flat()
+);
 
 export class RuntimeControlManager {
   private readonly runtimeBridgeAssetsDir: string;
@@ -39,6 +60,8 @@ export class RuntimeControlManager {
   private readonly runtimeBridgeManifestPath: string;
   private readonly commandSender: (command: RuntimeCommand) => Promise<unknown>;
   private bridgeVersion: string | null = null;
+  private nextSessionNumber = 1;
+  private activeRuntimeSession: RuntimeLaunchSession | null = null;
   private activeSessionId: string | null = null;
   private runtimeState: RuntimeState = { connected: false, sessionId: null, scenePath: null };
   private connectionStatus: RuntimeConnectionStatus = 'idle';
@@ -56,6 +79,54 @@ export class RuntimeControlManager {
     return { ...this.runtimeState };
   }
 
+  async startSession(projectPath: string): Promise<RuntimeLaunchSession> {
+    const sessionNumber = this.nextSessionNumber++;
+    const session = {
+      projectPath,
+      port: 4100,
+      token: `token-${sessionNumber}`,
+      sessionId: `session-${sessionNumber}`,
+    };
+
+    this.activeRuntimeSession = session;
+    this.setActiveSessionForTest(session.sessionId);
+    return session;
+  }
+
+  async stopSession(): Promise<void> {
+    this.activeRuntimeSession = null;
+    this.setActiveSessionForTest(null);
+  }
+
+  async acceptHandshake(payload: RuntimeHandshakeRequest): Promise<void> {
+    if (!this.activeRuntimeSession) {
+      throw new Error('No active runtime session.');
+    }
+
+    if (payload.token !== this.activeRuntimeSession.token) {
+      throw new Error('Invalid token');
+    }
+
+    if (payload.version !== this.getGeneratedBridgeVersion()) {
+      throw new Error('Bridge version mismatch');
+    }
+
+    if (payload.projectPath !== this.activeRuntimeSession.projectPath) {
+      throw new Error('Bridge connected for the wrong project');
+    }
+
+    if (payload.sessionId !== this.activeRuntimeSession.sessionId) {
+      throw new Error('Bridge session mismatch');
+    }
+
+    this.connectionStatus = 'connected';
+    this.runtimeState = {
+      connected: true,
+      sessionId: payload.sessionId,
+      scenePath: payload.scenePath ?? this.runtimeState.scenePath,
+    };
+  }
+
   async findNode(nodePath: string): Promise<unknown> {
     return this.sendCommand({ command: 'find_node', nodePath });
   }
@@ -64,6 +135,14 @@ export class RuntimeControlManager {
     const response = await this.sendCommand({ command: 'change_scene', scenePath });
     this.runtimeState = { ...this.runtimeState, scenePath };
     return response;
+  }
+
+  async invokeNodeAction(nodePath: string, action: string): Promise<unknown> {
+    if (!this.isSupportedNodeAction(nodePath, action)) {
+      throw new Error(`Unsupported node action: ${action}`);
+    }
+
+    return this.sendCommand({ command: 'invoke_node_action', nodePath, action });
   }
 
   async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -267,6 +346,15 @@ export class RuntimeControlManager {
       this.markDisconnected();
       throw new Error('Runtime bridge reconnect-required.');
     }
+  }
+
+  private isSupportedNodeAction(nodePath: string, action: string): boolean {
+    if (!SUPPORTED_NODE_ACTION_SET.has(action)) {
+      return false;
+    }
+
+    const nodeName = nodePath.split('/').filter(Boolean).pop() ?? '';
+    return /button/i.test(nodeName);
   }
 
   private markDisconnected(): void {

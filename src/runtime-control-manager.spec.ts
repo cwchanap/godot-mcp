@@ -93,6 +93,60 @@ describe('RuntimeControlManager', () => {
     }));
   });
 
+  it('rejects unsupported node actions before dispatch', async () => {
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.invokeNodeAction('root/Menu/Label', 'press')).rejects.toThrow(/unsupported/i);
+    expect(sendCommandMock).not.toHaveBeenCalled();
+  });
+
+  it('routes button press actions to the connected bridge session', async () => {
+    sendCommandMock.mockResolvedValue({
+      ok: true,
+      result: {
+        nodePath: 'root/Menu/StartButton',
+        action: 'press',
+      },
+    });
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await manager.invokeNodeAction('root/Menu/StartButton', 'press');
+
+    expect(sendCommandMock).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'invoke_node_action',
+      nodePath: 'root/Menu/StartButton',
+      action: 'press',
+    }));
+  });
+
+  it('rejects handshakes that present the wrong token', async () => {
+    const session = await manager.startSession(projectPath);
+
+    await expect(manager.acceptHandshake({
+      token: 'wrong-token',
+      version: bridgeVersion,
+      sessionId: session.sessionId,
+      projectPath,
+    })).rejects.toThrow(/invalid token/i);
+  });
+
+  it('rejects handshakes with a bridge version mismatch', async () => {
+    const session = await manager.startSession(projectPath);
+
+    await expect(manager.acceptHandshake({
+      token: session.token,
+      version: '0.0.9',
+      sessionId: session.sessionId,
+      projectPath,
+    })).rejects.toThrow(/version mismatch/i);
+  });
+
   it('returns a reconnect-required error after the active socket disconnects', async () => {
     manager.setConnectedSessionForTest({
       sessionId: 'session-1',

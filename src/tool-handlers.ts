@@ -25,6 +25,7 @@ type RuntimeToolManager = RuntimeBridgeManager & {
   getRuntimeState(): RuntimeState;
   findNode(nodePath: string): Promise<unknown>;
   changeScene(scenePath: string): Promise<unknown>;
+  invokeNodeAction(nodePath: string, action: string): Promise<unknown>;
 };
 
 export class ToolHandlers {
@@ -620,6 +621,39 @@ export class ToolHandlers {
         [
           'Start the project with runtime control enabled',
           'Reconnect the runtime bridge if the running project restarted',
+        ]
+      );
+    }
+  }
+
+  async handleInvokeNodeAction(args: any) {
+    args = this.operationExecutor.normalizeParameters(args);
+
+    if (!args.nodePath) {
+      return this.createErrorResponse(
+        'Node path is required',
+        ['Provide a valid node path in the running scene tree']
+      );
+    }
+
+    if (!args.action) {
+      return this.createErrorResponse(
+        'Action is required',
+        ['Provide a supported action such as "press"']
+      );
+    }
+
+    try {
+      const result = await this.runtimeControlManager.invokeNodeAction(args.nodePath, args.action);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to invoke runtime node action: ${error?.message || 'Unknown error'}`,
+        [
+          'Start the project with runtime control enabled',
+          'Use an allowlisted node action supported by the runtime bridge',
         ]
       );
     }
