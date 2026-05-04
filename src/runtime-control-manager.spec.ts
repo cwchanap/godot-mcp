@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RuntimeControlManager } from './runtime-control-manager.js';
@@ -259,9 +259,14 @@ describe('RuntimeControlManager', () => {
 
   it('refuses uninstall while the bridge session is active', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await manager.installBridge(projectPath);
     manager.setActiveSessionForTest('session-1');
 
     await expect(manager.uninstallBridge(projectPath)).rejects.toThrow(/running session/i);
+
+    await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(bridgeVersion);
+    await expect(readFile(manifestPath, 'utf8')).resolves.toContain(bridgeVersion);
+    await expect(readFile(projectFile, 'utf8')).resolves.toContain(runtimeBridgeAutoloadKey);
   });
 
   it('removes the owned autoload entry during uninstall', async () => {
@@ -271,6 +276,18 @@ describe('RuntimeControlManager', () => {
     await manager.uninstallBridge(projectPath);
 
     await expect(readFile(projectFile, 'utf8')).resolves.not.toContain(runtimeBridgeAutoloadKey);
+  });
+
+  it('keeps bridge files intact when autoload cleanup fails during uninstall', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await manager.installBridge(projectPath);
+    await chmod(projectFile, 0o444);
+
+    await expect(manager.uninstallBridge(projectPath)).rejects.toThrow();
+
+    await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(bridgeVersion);
+    await expect(readFile(manifestPath, 'utf8')).resolves.toContain(bridgeVersion);
+    await expect(readFile(projectFile, 'utf8')).resolves.toContain(runtimeBridgeAutoloadKey);
   });
 
   it('removes owned bridge autoload variants during uninstall', async () => {
