@@ -785,6 +785,35 @@ describe('RuntimeControlManager', () => {
     await expect(readFile(projectFile, 'utf8')).resolves.toContain(runtimeBridgeAutoloadKey);
   });
 
+  it('allows uninstalling a different project while a session is active', async () => {
+    const sessionManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await sessionManager.startSession(projectPath);
+
+    try {
+      const otherProjectPath = path.join(process.cwd(), '.test-artifacts', 'other-runtime-project');
+      const otherProjectFile = path.join(otherProjectPath, 'project.godot');
+      const otherBridgeDir = path.join(otherProjectPath, 'addons', 'godot_mcp_runtime');
+
+      try {
+        await mkdir(otherProjectPath, { recursive: true });
+        await writeFile(otherProjectFile, '[application]\nconfig/name="Other Project"\n');
+
+        const uninstallManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+        await uninstallManager.installBridge(otherProjectPath);
+
+        // Should succeed because the active session is for a different project
+        await uninstallManager.uninstallBridge(otherProjectPath);
+
+        await expect(readFile(otherProjectFile, 'utf8')).resolves.not.toContain(runtimeBridgeAutoloadKey);
+        await expect(rm(otherBridgeDir, { recursive: true, force: true })).resolves.toBeUndefined();
+      } finally {
+        await rm(otherProjectPath, { recursive: true, force: true });
+      }
+    } finally {
+      await sessionManager.stopSession();
+    }
+  });
+
   it('removes the owned autoload entry during uninstall', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     await manager.installBridge(projectPath);
