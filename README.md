@@ -70,6 +70,13 @@ This direct feedback loop helps AI assistants like Claude understand what works 
 - **Get Godot Version**: Retrieve the installed Godot version
 - **List Godot Projects**: Find Godot projects in a specified directory
 - **Project Analysis**: Get detailed information about project structure
+- **Runtime Bridge Management**:
+  - Install, update, inspect, and remove the managed runtime bridge addon
+- **Runtime Control**:
+  - Inspect runtime state for the active game session
+  - Find live nodes by path in the running scene tree
+  - Invoke supported button-like actions on live nodes
+  - Change scenes in a running game
 - **Scene Management**:
   - Create new scenes with specified root node types
   - Add nodes to existing scenes with customizable properties
@@ -139,7 +146,15 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
         "export_mesh_library",
         "save_scene",
         "get_uid",
-        "update_project_uids"
+        "update_project_uids",
+        "install_runtime_bridge",
+        "get_runtime_bridge_status",
+        "update_runtime_bridge",
+        "uninstall_runtime_bridge",
+        "get_runtime_state",
+        "find_node",
+        "invoke_node_action",
+        "change_scene"
       ]
     }
   }
@@ -193,6 +208,17 @@ When running the CLI directly or through an MCP host that supports `argumentConf
 - Provide an empty string or `null` in JSON (e.g. `{"godotPath":""}`) to clear a previously cached path and fall back to automatic detection
 - MCP hosts can send the same JSON via `argumentConfig`; the server reads from `MCP_ARGUMENT_CONFIG`, `MCP_SERVER_ARGUMENT_CONFIG`, or `MCP_CONFIG`
 
+### Step 5: Runtime Control Setup
+
+Runtime control depends on the managed runtime bridge addon being installed in the target project.
+
+Typical flow:
+
+1. Install the bridge with `install_runtime_bridge`.
+2. Optionally verify or maintain the install with `get_runtime_bridge_status`, `update_runtime_bridge`, or `uninstall_runtime_bridge`.
+3. Start the game with `run_project` and `runtimeControl: true`.
+4. Use `get_runtime_state`, `find_node`, `invoke_node_action`, and `change_scene` against the running session.
+
 ## Example Prompts
 
 Once configured, your AI assistant will automatically run the MCP server when needed. You can use prompts like:
@@ -221,6 +247,20 @@ Once configured, your AI assistant will automatically run the MCP server when ne
 "Get the UID for a specific script file in my Godot 4.4 project"
 
 "Update UID references in my Godot project after upgrading to 4.4"
+
+"Install the runtime bridge for /path/to/project"
+
+"Show the runtime bridge status for /path/to/project"
+
+"Run my project with runtime control enabled"
+
+"Inspect the current runtime state for my running game"
+
+"Find node root/Menu/StartButton in the running game"
+
+"Press the button at root/Menu/StartButton in the running game"
+
+"Change the running game to res://Level2.tscn"
 ```
 
 ## Implementation Details
