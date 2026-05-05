@@ -76,10 +76,10 @@ export class GodotServer {
 
     // Cleanup on exit
     process.on('SIGINT', () => {
-      void this.cleanup();
+      void this.shutdown();
     });
     process.on('SIGTERM', () => {
-      void this.cleanup();
+      void this.shutdown();
     });
   }
 
@@ -92,6 +92,26 @@ export class GodotServer {
     }
     await this.toolHandlers.cleanup();
     await this.server.close();
+  }
+
+  /**
+   * Graceful shutdown: cleanup then exit.
+   * Falls back to forced exit after a timeout if cleanup hangs.
+   */
+  private async shutdown() {
+    const forceExitTimer = setTimeout(() => {
+      console.error('[GODOT-SERVER] Cleanup timed out, forcing exit');
+      process.exit(1);
+    }, 5000);
+    forceExitTimer.unref();
+
+    try {
+      await this.cleanup();
+    } catch (error) {
+      console.error('[GODOT-SERVER] Cleanup error:', error);
+    }
+
+    process.exit(0);
   }
 
   /**

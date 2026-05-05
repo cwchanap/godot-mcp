@@ -277,7 +277,13 @@ export class RuntimeControlManager {
 
   async uninstallBridge(projectPath: string): Promise<void> {
     if (this.activeSessionId) {
-      throw new Error('Cannot uninstall runtime bridge while a running session is active.');
+      const normalizedPath = this.normalizeProjectPath(projectPath);
+      if (
+        !this.activeRuntimeSession ||
+        this.activeRuntimeSession.expectedProjectPath === normalizedPath
+      ) {
+        throw new Error('Cannot uninstall runtime bridge while a running session is active for this project.');
+      }
     }
 
     await this.updateProjectAutoload(projectPath, (projectText) => this.removeOwnedAutoload(projectText));
