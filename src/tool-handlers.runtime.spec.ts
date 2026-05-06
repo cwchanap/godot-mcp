@@ -135,6 +135,48 @@ describe('ToolHandlers runtime launch plumbing', () => {
     );
   });
 
+  it('clears activeProcess before async stopSession so old exit handler cannot tear down new session', async () => {
+    const runtimeManager = {
+      startSession: vi.fn().mockResolvedValue({
+        port: 4100,
+        token: 'token-2',
+        sessionId: 'session-2',
+      }),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    // First launch: create an initial active process
+    await handlers.handleRunProject({ projectPath });
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const firstProcess = spawnMock.mock.results[0].value;
+
+    // Second launch: should clear activeProcess before async operations
+    // Simulate stopSession being slow by delaying it
+    let resolveStopSession: () => void;
+    const stopSessionPromise = new Promise<void>((resolve) => { resolveStopSession = resolve; });
+    runtimeManager.stopSession.mockReturnValueOnce(stopSessionPromise);
+
+    const secondLaunchPromise = handlers.handleRunProject({ projectPath });
+
+    // While stopSession is still pending, activeProcess should already be null
+    // so the old process exit handler's identity check would fail
+    expect((handlers as any).activeProcess).toBeNull();
+
+    // Resolve stopSession so the second launch can proceed
+    resolveStopSession!();
+    await secondLaunchPromise;
+
+    // The new process should now be active
+    expect((handlers as any).activeProcess).not.toBeNull();
+    expect((handlers as any).activeProcess.process).toBe(spawnMock.mock.results[1].value);
+    expect(firstProcess.kill).toHaveBeenCalled();
+  });
+
   it('calls stopSession even if no active Godot process', async () => {
     const runtimeManager = {
       startSession: vi.fn(),
