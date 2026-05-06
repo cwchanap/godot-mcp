@@ -250,6 +250,25 @@ export class ToolHandlers {
       }
 
       if (shouldStartRuntimeControl) {
+        const bridgeStatus = await this.runtimeControlManager.getBridgeStatus(args.projectPath);
+        if (!bridgeStatus.installed) {
+          return this.createErrorResponse(
+            'Runtime bridge is not installed. Install it before using runtime control.',
+            [
+              'Use install_runtime_bridge to install the bridge addon first',
+              'Runtime control requires the bridge addon to be present in the project',
+            ]
+          );
+        }
+        if (!bridgeStatus.compatible) {
+          return this.createErrorResponse(
+            `Runtime bridge version ${bridgeStatus.version ?? 'unknown'} is not compatible with the server. Update it before using runtime control.`,
+            [
+              'Use update_runtime_bridge to update the bridge addon to the latest version',
+              'Runtime control requires a compatible bridge addon version',
+            ]
+          );
+        }
         const session = await this.runtimeControlManager.startSession(args.projectPath);
         cmdArgs.push(
           '--',

@@ -255,6 +255,11 @@ export class RuntimeControlManager {
       return { installed: false, version: null, compatible: false };
     }
 
+    const autoloadPresent = await this.hasOwnedAutoload(projectPath);
+    if (!autoloadPresent) {
+      return { installed: false, version: null, compatible: false };
+    }
+
     let version: string | null;
 
     try {
@@ -386,6 +391,28 @@ export class RuntimeControlManager {
 
   private isOwnedAutoloadLine(line: string): boolean {
     return line.trim().startsWith(RUNTIME_BRIDGE_AUTOLOAD_KEY);
+  }
+
+  private async hasOwnedAutoload(projectPath: string): Promise<boolean> {
+    const projectFilePath = join(projectPath, GODOT_PROJECT_FILE);
+    try {
+      const projectText = await readFile(projectFilePath, 'utf8');
+      if (!projectText.includes(AUTOLOAD_SECTION_HEADER)) {
+        return false;
+      }
+      const lines = projectText.split('\n');
+      const autoloadIndex = lines.findIndex((line) => line.trim() === AUTOLOAD_SECTION_HEADER);
+      if (autoloadIndex === -1) {
+        return false;
+      }
+      const autoloadEndIndex = lines.findIndex(
+        (line, index) => index > autoloadIndex && line.startsWith('[') && line.endsWith(']')
+      );
+      const autoloadLines = lines.slice(autoloadIndex + 1, autoloadEndIndex === -1 ? undefined : autoloadEndIndex);
+      return autoloadLines.some((line) => line.trim() === RUNTIME_BRIDGE_AUTOLOAD_LINE);
+    } catch {
+      return false;
+    }
   }
 
   private async pathExists(targetPath: string): Promise<boolean> {

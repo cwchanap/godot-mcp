@@ -89,6 +89,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-1',
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -111,6 +112,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-1',
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -133,6 +135,42 @@ describe('ToolHandlers runtime launch plumbing', () => {
       ]),
       expect.anything()
     );
+  });
+
+  it('returns an error when runtimeControl is true but bridge is not installed', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: false, version: null, compatible: false }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('not installed');
+    expect(runtimeManager.startSession).not.toHaveBeenCalled();
+  });
+
+  it('returns an error when runtimeControl is true but bridge is incompatible', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '0.0.1-stale', compatible: false }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('not compatible');
+    expect(runtimeManager.startSession).not.toHaveBeenCalled();
   });
 
   it('clears activeProcess before async stopSession so old exit handler cannot tear down new session', async () => {

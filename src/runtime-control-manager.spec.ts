@@ -638,6 +638,7 @@ describe('RuntimeControlManager', () => {
       )
     );
     await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(sourceBridgeScriptPath, 'utf8'));
+    await writeFile(projectFile, `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\n${canonicalRuntimeBridgeAutoloadLine}\n`);
 
     expect(await manager.getBridgeStatus(projectPath)).toEqual({
       installed: true,
@@ -670,11 +671,64 @@ describe('RuntimeControlManager', () => {
     });
   });
 
+  it('reports the bridge as not installed when autoload entry is missing from project.godot', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await mkdir(bridgeDir, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          name: 'godot_mcp_runtime',
+          version: bridgeVersion,
+          autoloadName: 'GodotMcpRuntimeBridge',
+          entryScript: 'runtime_bridge.gd',
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(sourceBridgeScriptPath, 'utf8'));
+    // project.godot has no [autoload] section — default from beforeEach
+
+    expect(await manager.getBridgeStatus(projectPath)).toEqual({
+      installed: false,
+      version: null,
+      compatible: false,
+    });
+  });
+
+  it('reports the bridge as not installed when autoload entry points to a wrong path', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await mkdir(bridgeDir, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          name: 'godot_mcp_runtime',
+          version: bridgeVersion,
+          autoloadName: 'GodotMcpRuntimeBridge',
+          entryScript: 'runtime_bridge.gd',
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(sourceBridgeScriptPath, 'utf8'));
+    await writeFile(projectFile, `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nGodotMcpRuntimeBridge="*res://addons/legacy/runtime_bridge.gd"\n`);
+
+    expect(await manager.getBridgeStatus(projectPath)).toEqual({
+      installed: false,
+      version: null,
+      compatible: false,
+    });
+  });
+
   it('reports an incompatible bridge when bridge_manifest.json is invalid', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     await mkdir(bridgeDir, { recursive: true });
     await writeFile(manifestPath, '{invalid json');
     await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(sourceBridgeScriptPath, 'utf8'));
+    await writeFile(projectFile, `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\n${canonicalRuntimeBridgeAutoloadLine}\n`);
 
     expect(await manager.getBridgeStatus(projectPath)).toEqual({
       installed: true,
@@ -704,6 +758,7 @@ describe('RuntimeControlManager', () => {
       path.join(bridgeDir, 'runtime_bridge.gd'),
       (await readFile(sourceBridgeScriptPath, 'utf8')).replaceAll('__PACKAGE_VERSION__', staleVersion)
     );
+    await writeFile(projectFile, `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\n${canonicalRuntimeBridgeAutoloadLine}\n`);
 
     expect(await manager.getBridgeStatus(projectPath)).toEqual({
       installed: true,
@@ -729,6 +784,7 @@ describe('RuntimeControlManager', () => {
       )
     );
     await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(sourceBridgeScriptPath, 'utf8'));
+    await writeFile(projectFile, `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\n${canonicalRuntimeBridgeAutoloadLine}\n`);
     await writeFile(path.join(generatedAssetsPath, 'runtime_bridge_manifest.json'), JSON.stringify({ name: 'broken' }));
 
     await expect(manager.getBridgeStatus(projectPath)).rejects.toThrow(
