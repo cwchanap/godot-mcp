@@ -233,10 +233,13 @@ export class ToolHandlers {
 
       const shouldStartRuntimeControl = args.runtimeControl === true;
 
-      // Kill any existing process
+      // Kill any existing process — clear activeProcess synchronously before any
+      // async work so the old process exit handler cannot tear down a new session.
       if (this.activeProcess) {
         this.logDebug('Killing existing Godot process before starting a new one');
-        this.activeProcess.process.kill();
+        const oldProcess = this.activeProcess;
+        this.activeProcess = null;
+        oldProcess.process.kill();
         await this.runtimeControlManager.stopSession();
       }
 
@@ -284,7 +287,9 @@ export class ToolHandlers {
         this.logDebug(`Godot process exited with code ${code}`);
         if (this.activeProcess && this.activeProcess.process === process) {
           this.activeProcess = null;
-          void this.runtimeControlManager.stopSession();
+          this.runtimeControlManager.stopSession().catch((err: unknown) => {
+            this.logDebug(`Error during stopSession on process exit: ${err}`);
+          });
         }
       });
 
@@ -292,7 +297,9 @@ export class ToolHandlers {
         console.error('Failed to start Godot process:', err);
         if (this.activeProcess && this.activeProcess.process === process) {
           this.activeProcess = null;
-          void this.runtimeControlManager.stopSession();
+          this.runtimeControlManager.stopSession().catch((stopErr: unknown) => {
+            this.logDebug(`Error during stopSession on process error: ${stopErr}`);
+          });
         }
       });
 
