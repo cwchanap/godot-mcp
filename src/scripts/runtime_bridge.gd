@@ -1,5 +1,4 @@
 extends Node
-class_name GodotMcpRuntimeBridge
 
 const BRIDGE_VERSION := "__PACKAGE_VERSION__"
 const MCP_HOST := "127.0.0.1"
