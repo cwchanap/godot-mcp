@@ -117,8 +117,14 @@ func _handle_command(message: Dictionary) -> Dictionary:
         _:
             return {"ok": false, "error": "Unsupported command"}
 
+func _resolve_node_path(node_path: String) -> String:
+    if node_path.begins_with("root/"):
+        return "/" + node_path
+    return node_path
+
 func _find_node(node_path: String) -> Dictionary:
-    var node := get_node_or_null(NodePath(node_path))
+    var resolved_path := _resolve_node_path(node_path)
+    var node := get_node_or_null(NodePath(resolved_path))
     if node == null:
         return {"ok": false, "error": "Node not found"}
 
@@ -147,7 +153,8 @@ func _change_scene(scene_path: String) -> Dictionary:
     }
 
 func _invoke_node_action(node_path: String, action: String) -> Dictionary:
-    var node := get_node_or_null(NodePath(node_path))
+    var resolved_path := _resolve_node_path(node_path)
+    var node := get_node_or_null(NodePath(resolved_path))
     if node == null:
         return {"ok": false, "error": "Node not found"}
 

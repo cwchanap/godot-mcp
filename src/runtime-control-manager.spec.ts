@@ -13,9 +13,9 @@ const projectFile = path.join(projectPath, 'project.godot');
 const sourceBridgeManifestPath = path.join(process.cwd(), 'src', 'scripts', 'runtime_bridge_manifest.json');
 const sourceBridgeScriptPath = path.join(process.cwd(), 'src', 'scripts', 'runtime_bridge.gd');
 const packageJsonPath = path.join(process.cwd(), 'package.json');
-const runtimeBridgeAutoloadKey = 'autoload/GodotMcpRuntimeBridge=';
+const runtimeBridgeAutoloadKey = 'GodotMcpRuntimeBridge=';
 const canonicalRuntimeBridgeAutoloadLine =
-  'autoload/GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
+  'GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
 const socketBuffers = new WeakMap<Socket, string>();
 
 async function connectBridgeClient(port: number): Promise<Socket> {
@@ -607,7 +607,7 @@ describe('RuntimeControlManager', () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     await writeFile(
       projectFile,
-      `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nautoload/GodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nautoload/OtherBridge="*res://addons/other/runtime_bridge.gd"\n`
+      `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nGodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nOtherBridge="*res://addons/other/runtime_bridge.gd"\n`
     );
 
     await manager.installBridge(projectPath);
@@ -618,7 +618,7 @@ describe('RuntimeControlManager', () => {
       .filter((line) => line.startsWith(runtimeBridgeAutoloadKey));
 
     expect(bridgeEntries).toEqual([canonicalRuntimeBridgeAutoloadLine]);
-    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
+    expect(projectContents).toContain('OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
 
   it('reads bridge status from bridge_manifest.json', async () => {
@@ -839,7 +839,7 @@ describe('RuntimeControlManager', () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     await writeFile(
       projectFile,
-      `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nautoload/GodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nautoload/OtherBridge="*res://addons/other/runtime_bridge.gd"\n`
+      `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nGodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nOtherBridge="*res://addons/other/runtime_bridge.gd"\n`
     );
 
     await manager.uninstallBridge(projectPath);
@@ -847,7 +847,7 @@ describe('RuntimeControlManager', () => {
     const projectContents = await readFile(projectFile, 'utf8');
 
     expect(projectContents).not.toContain(runtimeBridgeAutoloadKey);
-    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
+    expect(projectContents).toContain('OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
 
   it('preserves later config sections (e.g. [editor_plugins]) after [autoload] during install and uninstall', async () => {
@@ -857,7 +857,7 @@ describe('RuntimeControlManager', () => {
 config/name="Runtime Control Test"
 
 [autoload]
-autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"
+OtherBridge="*res://addons/other/runtime_bridge.gd"
 
 [editor_plugins]
 plugin_list={"MyPlugin":true}
@@ -873,7 +873,7 @@ plugin_list={"MyPlugin":true}
     // The bridge autoload must be present
     expect(projectContents).toContain(runtimeBridgeAutoloadKey);
     // The other autoload must be present
-    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
+    expect(projectContents).toContain('OtherBridge="*res://addons/other/runtime_bridge.gd"');
 
     // Uninstall bridge
     await manager.uninstallBridge(projectPath);
@@ -884,7 +884,7 @@ plugin_list={"MyPlugin":true}
     // The bridge autoload must be gone
     expect(projectContents).not.toContain(runtimeBridgeAutoloadKey);
     // The other autoload must still be present
-    expect(projectContents).toContain('autoload/OtherBridge="*res://addons/other/runtime_bridge.gd"');
+    expect(projectContents).toContain('OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
 }
 );

@@ -14,9 +14,9 @@ const RUNTIME_BRIDGE_MANIFEST = 'bridge_manifest.json';
 const GENERATED_BRIDGE_MANIFEST = 'runtime_bridge_manifest.json';
 const GODOT_PROJECT_FILE = 'project.godot';
 const AUTOLOAD_SECTION_HEADER = '[autoload]';
-const RUNTIME_BRIDGE_AUTOLOAD_KEY = 'autoload/GodotMcpRuntimeBridge=';
+const RUNTIME_BRIDGE_AUTOLOAD_KEY = 'GodotMcpRuntimeBridge=';
 const RUNTIME_BRIDGE_AUTOLOAD_LINE =
-  'autoload/GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
+  'GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
 
 type RuntimeControlManagerOptions = {
   runtimeBridgeAssetsDir?: string;
