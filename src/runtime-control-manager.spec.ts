@@ -942,5 +942,65 @@ plugin_list={"MyPlugin":true}
     // The other autoload must still be present
     expect(projectContents).toContain('OtherBridge="*res://addons/other/runtime_bridge.gd"');
   });
+
+  it('rejects scene paths that do not start with res://', async () => {
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.changeScene('/etc/passwd')).rejects.toThrow(/res:\/\//i);
+    expect(sendCommandMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects scene paths containing ".."', async () => {
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.changeScene('res://../secret.tscn')).rejects.toThrow(/\.\./);
+    expect(sendCommandMock).not.toHaveBeenCalled();
+  });
+
+  it('resets state even when stopSession encounters a close error', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await realManager.startSession(projectPath);
+
+    // Force the server's close callback to fail by closing the underlying
+    // handle manually so that server.close() rejects.
+    const server = (realManager as any).activeRuntimeSession.server as import('node:net').Server;
+    server.close();
+    // All sockets already destroyed; close again will error.
+
+    // stopSession should still clear activeRuntimeSession and reset state
+    // despite closeServer throwing.
+    await realManager.stopSession();
+    expect(realManager.getRuntimeState()).toEqual({
+      connected: false,
+      sessionId: null,
+      scenePath: null,
+    });
+  });
+
+  it('re-throws non-ENOENT FS errors from hasOwnedAutoload', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    await mkdir(bridgeDir, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({ name: 'godot_mcp_runtime', version: bridgeVersion, autoloadName: 'GodotMcpRuntimeBridge', entryScript: 'runtime_bridge.gd' })
+    );
+    await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'placeholder');
+    await writeFile(projectFile, `[autoload]\n${canonicalRuntimeBridgeAutoloadLine}\n`);
+
+    // Make project.godot unreadable (permissions error).
+    await chmod(projectFile, 0o000);
+
+    try {
+      await expect(manager.getBridgeStatus(projectPath)).rejects.toThrow();
+    } finally {
+      await chmod(projectFile, 0o644);
+    }
+  });
 }
 );

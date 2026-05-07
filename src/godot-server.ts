@@ -38,24 +38,19 @@ export class GodotServer {
   private runtimeControlManager: RuntimeToolManager;
 
   constructor(config?: GodotServerConfig) {
-    // Initialize path manager
     this.pathManager = new GodotPathManager({
       strictPathValidation: config?.strictPathValidation,
       initialPath: config?.godotPath
     });
 
-    // Set the path to the operations script
     const operationsScriptPath = join(__dirname, 'scripts', 'godot_operations.gd');
 
-    // Initialize operation executor
     this.operationExecutor = new OperationExecutor(operationsScriptPath);
 
     this.runtimeControlManager = new RuntimeControlManager() as RuntimeToolManager;
 
-    // Initialize tool handlers
     this.toolHandlers = new ToolHandlers(this.pathManager, this.operationExecutor, this.runtimeControlManager);
 
-    // Initialize the MCP server
     this.server = new Server(
       {
         name: 'godot-mcp',
@@ -99,6 +94,9 @@ export class GodotServer {
    * Falls back to forced exit after a timeout if cleanup hangs.
    */
   private async shutdown() {
+    // 5 s budget for teardown (stopSession, socket destroy, server close).
+    // If anything blocks beyond this the process is force-killed so the MCP
+    // host doesn't hang waiting for stdio to close.
     const forceExitTimer = setTimeout(() => {
       console.error('[GODOT-SERVER] Cleanup timed out, forcing exit');
       process.exit(1);
