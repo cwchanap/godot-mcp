@@ -1,5 +1,7 @@
 extends Node
 
+# __PACKAGE_VERSION__ is replaced at build time by scripts/build.js with the
+# version from package.json.  Do not edit this literal manually.
 const BRIDGE_VERSION := "__PACKAGE_VERSION__"
 const MCP_HOST := "127.0.0.1"
 
@@ -116,6 +118,8 @@ func _handle_command(message: Dictionary) -> Dictionary:
         _:
             return {"ok": false, "error": "Unsupported command"}
 
+# The MCP tool accepts node paths in the form "root/Node" for convenience
+# (matching the display convention), but Godot's SceneTree uses "/root/Node".
 func _resolve_node_path(node_path: String) -> String:
     if node_path.begins_with("root/"):
         return "/" + node_path

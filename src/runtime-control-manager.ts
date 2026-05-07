@@ -18,6 +18,11 @@ const RUNTIME_BRIDGE_AUTOLOAD_KEY = 'GodotMcpRuntimeBridge=';
 const RUNTIME_BRIDGE_AUTOLOAD_LINE =
   'GodotMcpRuntimeBridge="*res://addons/godot_mcp_runtime/runtime_bridge.gd"';
 
+// Maximum time (ms) a pre-handshake socket may idle before the server
+// destroys it. Prevents a stray localhost connection from blocking the
+// real bridge.
+const HANDSHAKE_TIMEOUT_MS = 5000;
+
 type RuntimeControlManagerOptions = {
   runtimeBridgeAssetsDir?: string;
   sendCommand?: (command: RuntimeCommand) => Promise<unknown>;
@@ -84,6 +89,7 @@ type ActiveRuntimeSession = RuntimeLaunchSession & {
   pendingRequests: Map<string, RuntimePendingRequest>;
   nextRequestNumber: number;
   connected: boolean;
+  handshakeTimer: ReturnType<typeof setTimeout> | null;
 };
 
 const BUTTON_LIKE_NODE_TYPES = new Set([
@@ -152,6 +158,7 @@ export class RuntimeControlManager {
       pendingRequests: new Map(),
       nextRequestNumber: 1,
       connected: false,
+      handshakeTimer: null,
     };
 
     this.activeRuntimeSession = session;
@@ -170,9 +177,18 @@ export class RuntimeControlManager {
     this.activeRuntimeSession = null;
 
     if (session) {
+      if (session.handshakeTimer) {
+        clearTimeout(session.handshakeTimer);
+        session.handshakeTimer = null;
+      }
       this.clearPendingRequests(session, new Error('Runtime session stopped.'));
       session.socket?.destroy();
-      await this.closeServer(session.server);
+      try {
+        await this.closeServer(session.server);
+      } finally {
+        this.setActiveSessionForTest(null);
+      }
+      return;
     }
 
     this.setActiveSessionForTest(null);
@@ -199,6 +215,12 @@ export class RuntimeControlManager {
       throw new Error('Bridge session mismatch');
     }
 
+    // Handshake succeeded — clear the pre-handshake deadline.
+    if (this.activeRuntimeSession.handshakeTimer) {
+      clearTimeout(this.activeRuntimeSession.handshakeTimer);
+      this.activeRuntimeSession.handshakeTimer = null;
+    }
+
     this.connectionStatus = 'connected';
     this.activeRuntimeSession.connected = true;
     this.runtimeState = {
@@ -213,6 +235,7 @@ export class RuntimeControlManager {
   }
 
   async changeScene(scenePath: string): Promise<unknown> {
+    this.validateScenePath(scenePath);
     const response = await this.sendCommand({ command: 'change_scene', scenePath }) as RuntimeChangeSceneResponse;
     if (response?.ok === true) {
       this.runtimeState = { ...this.runtimeState, scenePath };
@@ -255,6 +278,11 @@ export class RuntimeControlManager {
       return { installed: false, version: null, compatible: false };
     }
 
+    // An install is only considered complete when the autoload entry is also
+    // present in project.godot.  A user may have hand-edited the file to
+    // remove the entry, or a previous install may have left files without the
+    // autoload (half-install).  Reporting installed:false in either case lets
+    // the caller re-install to fix the inconsistency.
     const autoloadPresent = await this.hasOwnedAutoload(projectPath);
     if (!autoloadPresent) {
       return { installed: false, version: null, compatible: false };
@@ -281,6 +309,10 @@ export class RuntimeControlManager {
   }
 
   async uninstallBridge(projectPath: string): Promise<void> {
+    // Prevent uninstalling the bridge from the project that currently has an
+    // active runtime session — the running game would lose its autoload and
+    // the MCP server's socket would be orphaned.  Uninstalling a *different*
+    // project is safe because its bridge is not connected.
     if (this.activeSessionId) {
       const normalizedPath = this.normalizeProjectPath(projectPath);
       if (
@@ -410,7 +442,14 @@ export class RuntimeControlManager {
       );
       const autoloadLines = lines.slice(autoloadIndex + 1, autoloadEndIndex === -1 ? undefined : autoloadEndIndex);
       return autoloadLines.some((line) => line.trim() === RUNTIME_BRIDGE_AUTOLOAD_LINE);
-    } catch {
+    } catch (error: unknown) {
+      // ENOENT means project.godot doesn't exist — the bridge is genuinely
+      // not installed.  Any other FS error (EACCES, EISDIR, etc.) should
+      // propagate so the caller can report the real problem instead of
+      // directing the user into a re-install loop.
+      if (error && typeof error === 'object' && 'code' in error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
       return false;
     }
   }
@@ -519,6 +558,16 @@ export class RuntimeControlManager {
     return SUPPORTED_NODE_ACTIONS.get(action)?.has(nodeType) ?? false;
   }
 
+  private validateScenePath(scenePath: string): void {
+    if (!scenePath.startsWith('res://')) {
+      throw new Error('Scene path must start with res://');
+    }
+
+    if (scenePath.includes('..')) {
+      throw new Error('Scene path must not contain ".."');
+    }
+  }
+
   private markDisconnected(): void {
     if (this.activeRuntimeSession) {
       this.activeRuntimeSession.connected = false;
@@ -547,8 +596,23 @@ export class RuntimeControlManager {
     session.receiveBuffer = '';
     socket.setEncoding('utf8');
     socket.on('data', (chunk) => this.handleSocketData(session, socket, chunk));
-    socket.on('error', () => undefined);
+    socket.on('error', (error) => {
+      console.error(`[RUNTIME] socket error (session ${session.sessionId}): ${error.message}`);
+    });
     socket.on('close', () => this.handleSocketClose(session, socket));
+
+    // Start a handshake deadline. If no valid hello arrives within the
+    // timeout, destroy the socket so it doesn't block the real bridge.
+    if (session.handshakeTimer) {
+      clearTimeout(session.handshakeTimer);
+    }
+    session.handshakeTimer = setTimeout(() => {
+      if (session.socket === socket && !session.connected) {
+        console.error(`[RUNTIME] handshake timeout for session ${session.sessionId}, closing socket`);
+        socket.destroy();
+      }
+      session.handshakeTimer = null;
+    }, HANDSHAKE_TIMEOUT_MS);
   }
 
   private handleSocketData(session: ActiveRuntimeSession, socket: Socket, chunk: string | Buffer): void {
@@ -624,6 +688,11 @@ export class RuntimeControlManager {
   private handleSocketClose(session: ActiveRuntimeSession, socket: Socket): void {
     if (this.activeRuntimeSession !== session || session.socket !== socket) {
       return;
+    }
+
+    if (session.handshakeTimer) {
+      clearTimeout(session.handshakeTimer);
+      session.handshakeTimer = null;
     }
 
     const wasConnected = session.connected;
@@ -703,6 +772,11 @@ export class RuntimeControlManager {
   }
 
   private runSocketTask(task: Promise<void>): void {
-    void task.catch(() => undefined);
+    void task.catch((error: unknown) => {
+      console.error(
+        '[RUNTIME] socket task failed:',
+        error instanceof Error ? error.message : error
+      );
+    });
   }
 }

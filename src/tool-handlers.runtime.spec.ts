@@ -228,7 +228,59 @@ describe('ToolHandlers runtime launch plumbing', () => {
     // No process started, so activeProcess is null
     const result = await handlers.handleStopProject();
     expect(runtimeManager.stopSession).toHaveBeenCalled();
-    expect(result.content[0].text).toMatch(/Runtime session cleaned up/);
+    expect(result.content[0].text).toMatch(/Runtime session torn down/);
+  });
+
+  it('kills the Godot process before awaiting stopSession during cleanup', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    await handlers.handleRunProject({ projectPath });
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const process = spawnMock.mock.results[0].value;
+
+    const stopOrder: string[] = [];
+    process.kill.mockImplementation(() => { stopOrder.push('kill'); });
+    runtimeManager.stopSession.mockImplementation(async () => {
+      stopOrder.push('stopSession');
+    });
+
+    await handlers.cleanup();
+
+    // Process should be killed before stopSession is awaited
+    expect(stopOrder).toEqual(['kill', 'stopSession']);
+    expect((handlers as any).activeProcess).toBeNull();
+  });
+
+  it('does not lose the original error when stopSession throws in the catch path', async () => {
+    const runtimeManager = {
+      startSession: vi.fn().mockResolvedValue({
+        port: 4100,
+        token: 'token-1',
+        sessionId: 'session-1',
+      }),
+      stopSession: vi.fn().mockRejectedValue(new Error('stopSession boom')),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    // Force a spawn error by making spawn throw
+    spawnMock.mockImplementation(() => { throw new Error('spawn ENOENT'); });
+
+    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('spawn ENOENT');
   });
 });
 

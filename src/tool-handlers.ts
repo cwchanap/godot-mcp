@@ -111,12 +111,18 @@ export class ToolHandlers {
    */
   async cleanup(): Promise<void> {
     this.logDebug('Cleaning up resources');
-    await this.runtimeControlManager.stopSession();
+
+    // Kill the child process first (or in parallel with bridge teardown) so a
+    // wedged TCP stopSession cannot block the kill. The force-exit timer in
+    // godot-server.ts is the last-resort safety net, but we should avoid
+    // relying on it for routine shutdown.
     if (this.activeProcess) {
       this.logDebug('Killing active Godot process');
       this.activeProcess.process.kill();
       this.activeProcess = null;
     }
+
+    await this.runtimeControlManager.stopSession();
   }
 
   /**
@@ -333,7 +339,9 @@ export class ToolHandlers {
         ],
       };
     } catch (error: unknown) {
-      await this.runtimeControlManager.stopSession();
+      await this.runtimeControlManager.stopSession().catch((stopError: unknown) => {
+        this.logDebug(`Error during stopSession in catch path: ${stopError}`);
+      });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResponse(
         `Failed to run Godot project: ${errorMessage}`,
@@ -389,7 +397,7 @@ export class ToolHandlers {
             type: 'text',
             text: JSON.stringify(
               {
-                message: 'No active Godot process to stop. Runtime session cleaned up.'
+                message: 'No active Godot process to stop. Runtime session torn down if present.'
               },
               null,
               2
