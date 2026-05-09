@@ -162,6 +162,10 @@ func _invoke_node_action(node_path: String, action: String) -> Dictionary:
         return {"ok": false, "error": "Node not found"}
 
     if node is BaseButton and action == "press":
+        if node.disabled:
+            return {"ok": false, "error": "Button is disabled"}
+        if node.toggle_mode:
+            node.button_pressed = not node.button_pressed
         node.emit_signal("pressed")
         return {
             "ok": true,
