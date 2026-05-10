@@ -173,6 +173,35 @@ describe('ToolHandlers runtime launch plumbing', () => {
     expect(runtimeManager.startSession).not.toHaveBeenCalled();
   });
 
+  it('does not kill the existing process when bridge preflight fails', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: false, version: null, compatible: false }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    // First launch: create an initial active process (no runtime control)
+    await handlers.handleRunProject({ projectPath });
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const firstProcess = spawnMock.mock.results[0].value;
+
+    // Second launch with runtimeControl but bridge not installed:
+    // should return error without killing the first process
+    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('not installed');
+    expect(firstProcess.kill).not.toHaveBeenCalled();
+    expect(runtimeManager.stopSession).not.toHaveBeenCalled();
+    // The original process should still be tracked
+    expect((handlers as any).activeProcess).not.toBeNull();
+    expect((handlers as any).activeProcess.process).toBe(firstProcess);
+  });
+
   it('clears activeProcess before async stopSession so old exit handler cannot tear down new session', async () => {
     const runtimeManager = {
       startSession: vi.fn().mockResolvedValue({

@@ -186,7 +186,11 @@ export class RuntimeControlManager {
       try {
         await this.closeServer(session.server);
       } finally {
-        this.setActiveSessionForTest(null);
+        // Only clear the active session ID if no new session was started
+        // while we were waiting for the server to close.
+        if (this.activeSessionId === session.sessionId) {
+          this.setActiveSessionForTest(null);
+        }
       }
       return;
     }
