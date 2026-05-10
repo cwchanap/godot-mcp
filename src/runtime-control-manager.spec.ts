@@ -983,6 +983,48 @@ plugin_list={"MyPlugin":true}
     });
   });
 
+  it('does not clear a newer session when a stale stopSession resolves', async () => {
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+
+    // Start session A
+    const sessionA = await realManager.startSession(projectPath);
+    expect(realManager.getRuntimeState().sessionId).toBe(sessionA.sessionId);
+
+    // Capture session A's server so we can delay its close
+    const serverA = (realManager as any).activeRuntimeSession.server as import('node:net').Server;
+    const originalClose = serverA.close.bind(serverA);
+
+    // Replace server.close with a version that resolves after a delay
+    // to simulate a slow async close that overlaps with a new session.
+    let resolveDelayedClose: () => void;
+    const delayedClosePromise = new Promise<void>((resolve) => { resolveDelayedClose = resolve; });
+    serverA.close = ((cb?: (err?: Error) => void) => {
+      void delayedClosePromise.then(() => {
+        originalClose(cb);
+      });
+      return serverA;
+    }) as typeof serverA.close;
+
+    // Start stopSession for A (will block on the delayed close)
+    const stopPromise = realManager.stopSession();
+
+    // Immediately start a new session B (the inner stopSession in startSession
+    // is a no-op since activeRuntimeSession was already nulled)
+    const sessionB = await realManager.startSession(projectPath);
+    expect(realManager.getRuntimeState().sessionId).toBe(sessionB.sessionId);
+    expect(sessionB.sessionId).not.toBe(sessionA.sessionId);
+
+    // Now resolve the delayed close for session A's server
+    resolveDelayedClose!();
+    await stopPromise;
+
+    // The new session B should still be the active session — the stale
+    // stopSession should NOT have cleared B's state.
+    expect(realManager.getRuntimeState().sessionId).toBe(sessionB.sessionId);
+
+    await realManager.stopSession();
+  });
+
   it('re-throws non-ENOENT FS errors from hasOwnedAutoload', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     await mkdir(bridgeDir, { recursive: true });

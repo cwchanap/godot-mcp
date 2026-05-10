@@ -239,22 +239,8 @@ export class ToolHandlers {
 
       const shouldStartRuntimeControl = args.runtimeControl === true;
 
-      // Kill any existing process — clear activeProcess synchronously before any
-      // async work so the old process exit handler cannot tear down a new session.
-      if (this.activeProcess) {
-        this.logDebug('Killing existing Godot process before starting a new one');
-        const oldProcess = this.activeProcess;
-        this.activeProcess = null;
-        oldProcess.process.kill();
-        await this.runtimeControlManager.stopSession();
-      }
-
-      const cmdArgs = ['-d', '--path', args.projectPath];
-      if (args.scene && ProjectUtils.validatePath(args.scene)) {
-        this.logDebug(`Adding scene parameter: ${args.scene}`);
-        cmdArgs.push(args.scene);
-      }
-
+      // Validate the bridge BEFORE killing the existing process so a failed
+      // preflight check does not leave the user without a running game.
       if (shouldStartRuntimeControl) {
         const bridgeStatus = await this.runtimeControlManager.getBridgeStatus(args.projectPath);
         if (!bridgeStatus.installed) {
@@ -275,6 +261,25 @@ export class ToolHandlers {
             ]
           );
         }
+      }
+
+      // Kill any existing process — clear activeProcess synchronously before any
+      // async work so the old process exit handler cannot tear down a new session.
+      if (this.activeProcess) {
+        this.logDebug('Killing existing Godot process before starting a new one');
+        const oldProcess = this.activeProcess;
+        this.activeProcess = null;
+        oldProcess.process.kill();
+        await this.runtimeControlManager.stopSession();
+      }
+
+      const cmdArgs = ['-d', '--path', args.projectPath];
+      if (args.scene && ProjectUtils.validatePath(args.scene)) {
+        this.logDebug(`Adding scene parameter: ${args.scene}`);
+        cmdArgs.push(args.scene);
+      }
+
+      if (shouldStartRuntimeControl) {
         const session = await this.runtimeControlManager.startSession(args.projectPath);
         cmdArgs.push(
           '--',
