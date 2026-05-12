@@ -270,7 +270,9 @@ export class ToolHandlers {
         const oldProcess = this.activeProcess;
         this.activeProcess = null;
         oldProcess.process.kill();
-        await this.runtimeControlManager.stopSession();
+        await this.runtimeControlManager.stopSession().catch((err: unknown) => {
+          this.logDebug(`Error during stopSession on run_project restart: ${err}`);
+        });
       }
 
       const cmdArgs = ['-d', '--path', args.projectPath];
@@ -395,7 +397,9 @@ export class ToolHandlers {
    */
   async handleStopProject() {
     if (!this.activeProcess) {
-      await this.runtimeControlManager.stopSession();
+      await this.runtimeControlManager.stopSession().catch((err: unknown) => {
+        this.logDebug(`Error during stopSession on stop_project (no active process): ${err}`);
+      });
       return {
         content: [
           {
@@ -417,7 +421,9 @@ export class ToolHandlers {
     const output = this.activeProcess.output;
     const errors = this.activeProcess.errors;
     this.activeProcess = null;
-    await this.runtimeControlManager.stopSession();
+    await this.runtimeControlManager.stopSession().catch((err: unknown) => {
+      this.logDebug(`Error during stopSession on stop_project: ${err}`);
+    });
 
     return {
       content: [
