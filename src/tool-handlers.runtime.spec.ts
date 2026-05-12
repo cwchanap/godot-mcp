@@ -260,6 +260,66 @@ describe('ToolHandlers runtime launch plumbing', () => {
     expect(result.content[0].text).toMatch(/Runtime session torn down/);
   });
 
+  it('tolerates stopSession rejection during stop_project with no active process', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+    const result = await handlers.handleStopProject();
+    expect(runtimeManager.stopSession).toHaveBeenCalled();
+    expect(result.content[0].text).toMatch(/Runtime session torn down/);
+  });
+
+  it('tolerates stopSession rejection during stop_project with active process', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+    await handlers.handleRunProject({ projectPath });
+    const result = await handlers.handleStopProject();
+    expect(runtimeManager.stopSession).toHaveBeenCalled();
+    expect(result.content[0].text).toMatch(/Godot project stopped/);
+    expect((handlers as any).activeProcess).toBeNull();
+  });
+
+  it('tolerates stopSession rejection during run_project restart', async () => {
+    const runtimeManager = {
+      startSession: vi.fn().mockResolvedValue({
+        port: 4100,
+        token: 'token-2',
+        sessionId: 'session-2',
+      }),
+      stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
+      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    // First launch
+    await handlers.handleRunProject({ projectPath });
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const firstProcess = spawnMock.mock.results[0].value;
+
+    // Second launch: stopSession rejects but should not prevent the new launch
+    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    expect(firstProcess.kill).toHaveBeenCalled();
+    expect(runtimeManager.stopSession).toHaveBeenCalled();
+    expect(result.content[0].text).toMatch(/Godot project started/);
+  });
+
   it('kills the Godot process before awaiting stopSession during cleanup', async () => {
     const runtimeManager = {
       startSession: vi.fn(),

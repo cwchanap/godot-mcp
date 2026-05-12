@@ -400,22 +400,6 @@ describe('RuntimeControlManager', () => {
       await readJsonLine(socket);
 
       const actionPromise = realManager.invokeNodeAction('root/Menu/StartButton', 'press');
-      const findRequest = await readJsonLine(socket);
-      expect(findRequest).toMatchObject({
-        command: 'find_node',
-        nodePath: 'root/Menu/StartButton',
-        requestId: expect.any(String),
-      });
-      await writeJsonLine(socket, {
-        requestId: findRequest.requestId,
-        ok: true,
-        result: {
-          found: true,
-          nodePath: 'root/Menu/StartButton',
-          nodeType: 'Button',
-        },
-      });
-
       const actionRequest = await readJsonLine(socket);
       expect(actionRequest).toMatchObject({
         command: 'invoke_node_action',
@@ -465,45 +449,42 @@ describe('RuntimeControlManager', () => {
     }));
   });
 
-  it('rejects press actions for resolved non-button node types before dispatch', async () => {
+  it('sends press action to the bridge even for non-standard node types', async () => {
     sendCommandMock.mockResolvedValue({
-      ok: true,
-      result: {
-        found: true,
-        nodePath: 'root/Menu/StartButton',
-        nodeType: 'Label',
-      },
+      ok: false,
+      error: 'Unsupported action',
     });
     manager.setConnectedSessionForTest({
       sessionId: 'session-1',
       scenePath: 'res://Main.tscn',
     });
 
-    await expect(manager.invokeNodeAction('root/Menu/StartButton', 'press')).rejects.toThrow(/unsupported/i);
-    expect(sendCommandMock).toHaveBeenCalledTimes(1);
+    await manager.invokeNodeAction('root/Menu/StartButton', 'press');
     expect(sendCommandMock).toHaveBeenCalledWith(expect.objectContaining({
-      command: 'find_node',
+      command: 'invoke_node_action',
       nodePath: 'root/Menu/StartButton',
+      action: 'press',
     }));
   });
 
+  it('rejects unknown actions before sending to the bridge', async () => {
+    manager.setConnectedSessionForTest({
+      sessionId: 'session-1',
+      scenePath: 'res://Main.tscn',
+    });
+
+    await expect(manager.invokeNodeAction('root/Menu/StartButton', 'explode')).rejects.toThrow(/unsupported/i);
+    expect(sendCommandMock).not.toHaveBeenCalled();
+  });
+
   it('routes button press actions to the connected bridge session', async () => {
-    sendCommandMock
-      .mockResolvedValueOnce({
-        ok: true,
-        result: {
-          found: true,
-          nodePath: 'root/Menu/StartButton',
-          nodeType: 'Button',
-        },
-      })
-      .mockResolvedValueOnce({
+    sendCommandMock.mockResolvedValueOnce({
       ok: true,
       result: {
         nodePath: 'root/Menu/StartButton',
         action: 'press',
       },
-      });
+    });
     manager.setConnectedSessionForTest({
       sessionId: 'session-1',
       scenePath: 'res://Main.tscn',
@@ -511,11 +492,7 @@ describe('RuntimeControlManager', () => {
 
     await manager.invokeNodeAction('root/Menu/StartButton', 'press');
 
-    expect(sendCommandMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      command: 'find_node',
-      nodePath: 'root/Menu/StartButton',
-    }));
-    expect(sendCommandMock).toHaveBeenNthCalledWith(2, expect.objectContaining({
+    expect(sendCommandMock).toHaveBeenCalledWith(expect.objectContaining({
       command: 'invoke_node_action',
       nodePath: 'root/Menu/StartButton',
       action: 'press',
