@@ -23,6 +23,9 @@ const RUNTIME_BRIDGE_AUTOLOAD_LINE =
 // real bridge.
 const HANDSHAKE_TIMEOUT_MS = 5000;
 
+// Maximum time (ms) to wait for a runtime command reply before rejecting.
+const COMMAND_REPLY_TIMEOUT_MS = 10000;
+
 type RuntimeControlManagerOptions = {
   runtimeBridgeAssetsDir?: string;
   sendCommand?: (command: RuntimeCommand) => Promise<unknown>;
@@ -502,9 +505,35 @@ export class RuntimeControlManager {
     const requestId = `${session.sessionId}:${session.nextRequestNumber++}`;
 
     return new Promise<unknown>((resolveRequest, rejectRequest) => {
+      let settled = false;
+      const replyTimer = setTimeout(() => {
+        if (session.pendingRequests.delete(requestId)) {
+          settled = true;
+          rejectRequest(new Error(`Runtime command timed out after ${COMMAND_REPLY_TIMEOUT_MS}ms.`));
+        }
+      }, COMMAND_REPLY_TIMEOUT_MS);
+
+      // Prevent the timer from keeping the process alive.
+      if (replyTimer.unref) {
+        replyTimer.unref();
+      }
+
+      const wrappedResolve = (value: unknown) => {
+        clearTimeout(replyTimer);
+        settled = true;
+        resolveRequest(value);
+      };
+
+      const wrappedReject = (reason?: unknown) => {
+        clearTimeout(replyTimer);
+        if (!settled) {
+          rejectRequest(reason);
+        }
+      };
+
       session.pendingRequests.set(requestId, {
-        resolve: resolveRequest,
-        reject: rejectRequest,
+        resolve: wrappedResolve,
+        reject: wrappedReject,
       });
 
       void this.sendSocketMessage(socket, {
@@ -512,6 +541,7 @@ export class RuntimeControlManager {
         ...command,
       }).catch((error) => {
         if (session.pendingRequests.delete(requestId)) {
+          clearTimeout(replyTimer);
           rejectRequest(error);
         }
       });

@@ -6,7 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it, vi } from 'vitest';
 import { GodotServer } from './godot-server.js';
 
-const hasGodot = Boolean(process.env.GODOT_PATH);
+const hasGodot = Boolean(process.env.GODOT_PATH) && Boolean(process.env.GODOT_RUNTIME_INTEGRATION_TEST);
 const repoRoot = process.cwd();
 const scratchFixturePath = resolve(repoRoot, '.tmp', 'runtime-control-fixture');
 const fixtureMainScenePath = join(scratchFixturePath, 'Main.tscn');

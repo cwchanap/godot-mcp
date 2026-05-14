@@ -429,6 +429,43 @@ describe('RuntimeControlManager', () => {
     }
   });
 
+  it('rejects pending requests when the bridge does not reply within the timeout', async () => {
+    vi.useFakeTimers();
+    const realManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await realManager.startSession(projectPath);
+    const socket = await connectBridgeClient(session.port);
+
+    try {
+      await writeJsonLine(socket, {
+        command: 'hello',
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath,
+        scenePath: 'res://Main.tscn',
+      });
+      await readJsonLine(socket);
+
+      // Use the internal command sender directly so the timeout rejection
+      // is not swallowed by the sendCommand wrapper.
+      const commandPromise = (realManager as any).sendCommandOverSocket({
+        command: 'find_node',
+        nodePath: 'root/Main/SomeButton',
+      });
+
+      // Read the command that the manager sent but do NOT reply.
+      await readJsonLine(socket);
+
+      vi.advanceTimersByTime(10000);
+
+      await expect(commandPromise).rejects.toThrow(/timed out/);
+    } finally {
+      vi.useRealTimers();
+      await closeBridgeClient(socket);
+      await realManager.stopSession();
+    }
+  });
+
   it('returns a disconnected error when change_scene is called without a connected bridge', async () => {
     await expect(manager.changeScene('res://Main.tscn')).rejects.toThrow(/not connected/i);
     expect(sendCommandMock).not.toHaveBeenCalled();
