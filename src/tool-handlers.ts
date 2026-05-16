@@ -225,6 +225,8 @@ export class ToolHandlers {
       );
     }
 
+    let sessionStartedByThisInvocation = false;
+
     try {
       // Check if the project directory exists and contains a project.godot file
       if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
@@ -283,6 +285,7 @@ export class ToolHandlers {
 
       if (shouldStartRuntimeControl) {
         const session = await this.runtimeControlManager.startSession(args.projectPath);
+        sessionStartedByThisInvocation = true;
         cmdArgs.push(
           '--',
           '--godot-mcp-port',
@@ -346,9 +349,11 @@ export class ToolHandlers {
         ],
       };
     } catch (error: unknown) {
-      await this.runtimeControlManager.stopSession().catch((stopError: unknown) => {
-        this.logDebug(`Error during stopSession in catch path: ${stopError}`);
-      });
+      if (sessionStartedByThisInvocation) {
+        await this.runtimeControlManager.stopSession().catch((stopError: unknown) => {
+          this.logDebug(`Error during stopSession in catch path: ${stopError}`);
+        });
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResponse(
         `Failed to run Godot project: ${errorMessage}`,

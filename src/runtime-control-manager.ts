@@ -245,10 +245,8 @@ export class RuntimeControlManager {
   async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
     const targetDir = this.getBridgeTargetDir(projectPath);
     await mkdir(targetDir, { recursive: true });
-    await Promise.all([
-      this.copyBridgeAsset(this.runtimeBridgeScriptPath, join(targetDir, RUNTIME_BRIDGE_SCRIPT)),
-      this.copyBridgeAsset(this.runtimeBridgeManifestPath, join(targetDir, RUNTIME_BRIDGE_MANIFEST)),
-    ]);
+    await this.copyBridgeAsset(this.runtimeBridgeScriptPath, join(targetDir, RUNTIME_BRIDGE_SCRIPT));
+    await this.copyBridgeAsset(this.runtimeBridgeManifestPath, join(targetDir, RUNTIME_BRIDGE_MANIFEST));
     await this.updateProjectAutoload(projectPath, (projectText) => this.ensureAutoloadSection(projectText));
     return this.getBridgeStatus(projectPath);
   }
