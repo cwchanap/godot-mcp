@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { Socket, createConnection } from 'node:net';
 import path from 'path';
@@ -567,6 +567,25 @@ describe('RuntimeControlManager', () => {
       sessionId: session.sessionId,
       projectPath: `${projectPath}-other`,
     })).rejects.toThrow(/wrong project/i);
+  });
+
+  it('accepts handshakes when project path is a symlink', async () => {
+    const symlinkPath = path.join(process.cwd(), '.test-artifacts', 'runtime-symlink');
+    await unlink(symlinkPath).catch(() => {});
+    await symlink(projectPath, symlinkPath);
+
+    try {
+      const session = await manager.startSession(symlinkPath);
+
+      await expect(manager.acceptHandshake({
+        token: session.token,
+        version: bridgeVersion,
+        sessionId: session.sessionId,
+        projectPath,
+      })).resolves.toBeUndefined();
+    } finally {
+      await unlink(symlinkPath).catch(() => {});
+    }
   });
 
   it('returns a reconnect-required error after the active socket disconnects', async () => {

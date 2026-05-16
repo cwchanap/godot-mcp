@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { accessSync, constants, readFileSync } from 'node:fs';
+import { accessSync, constants, readFileSync, realpathSync } from 'node:fs';
 import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type Socket } from 'node:net';
 import { dirname, join, normalize, parse, resolve } from 'path';
@@ -750,7 +750,14 @@ export class RuntimeControlManager {
   }
 
   private normalizeProjectPath(projectPath: string): string {
-    const normalizedPath = normalize(resolve(projectPath));
+    const resolved = resolve(projectPath);
+    let realPath: string;
+    try {
+      realPath = realpathSync(resolved);
+    } catch {
+      realPath = resolved;
+    }
+    const normalizedPath = normalize(realPath);
     const root = parse(normalizedPath).root;
     const trimmedPath = normalizedPath.length > root.length
       ? normalizedPath.replace(/[\\/]+$/, '')
