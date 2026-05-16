@@ -371,6 +371,30 @@ describe('ToolHandlers runtime launch plumbing', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('spawn ENOENT');
   });
+
+  it('does not call stopSession in the catch path when the session was not started by this invocation', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockRejectedValue(new Error('EACCES: permission denied')),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      { normalizeParameters: (args: unknown) => args },
+      runtimeManager
+    );
+
+    // First launch without runtime control to create an active process
+    await handlers.handleRunProject({ projectPath });
+
+    // Second launch with runtime control: getBridgeStatus throws before
+    // startSession is called — the catch path must NOT tear down the session.
+    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('EACCES');
+    expect(runtimeManager.startSession).not.toHaveBeenCalled();
+    expect(runtimeManager.stopSession).not.toHaveBeenCalled();
+  });
 });
 
 describe('GodotServer runtime bridge management tools', () => {
