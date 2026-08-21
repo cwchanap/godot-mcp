@@ -33,4 +33,19 @@ describe('ToolHandlers class-name validation', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe('Invalid nodeType');
   });
+
+  it('rejects a script resource in add_node properties', async () => {
+    const result = await createHandlers().handleAddNode({
+      projectPath: '/workspace/project',
+      scenePath: 'scene.tscn',
+      nodeType: 'Node',
+      nodeName: 'Evil',
+      properties: {
+        script: 'res://evil.gd',
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('Invalid properties');
+  });
 });

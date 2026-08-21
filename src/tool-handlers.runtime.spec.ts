@@ -74,6 +74,19 @@ async function listTools(server: GodotServer) {
   });
 }
 
+describe('GodotServer metadata', () => {
+  it('reports the package version during initialization', async () => {
+    const server = new GodotServer();
+
+    await withConnectedClient(server, async (client) => {
+      expect(client.getServerVersion()).toEqual({
+        name: 'godot-mcp',
+        version: '0.1.1',
+      });
+    });
+  });
+});
+
 describe('ToolHandlers runtime launch plumbing', () => {
   beforeEach(() => {
     existsSyncMock.mockReset();

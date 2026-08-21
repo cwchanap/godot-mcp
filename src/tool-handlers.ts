@@ -1003,6 +1003,13 @@ export class ToolHandlers {
       );
     }
 
+    if (args.properties && Object.prototype.hasOwnProperty.call(args.properties, 'script')) {
+      return this.createErrorResponse(
+        'Invalid properties',
+        ['The script property cannot be set through add_node']
+      );
+    }
+
     try {
       if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
         return this.createErrorResponse(
