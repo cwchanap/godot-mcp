@@ -1,6 +1,6 @@
 {
   "name": "@coding-solo/godot-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for interfacing with Godot game engine. Provides tools for launching the editor, running projects, and capturing debug output.",
   "keywords": [
     "godot",

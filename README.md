@@ -75,6 +75,7 @@ Godot MCP enables AI agents to launch the Godot editor, run projects, capture de
   - Find live nodes by path in the running scene tree
   - Invoke supported button-like actions on live nodes
   - Change scenes in a running game
+  - Capture the active game's rendered root viewport as a PNG image
 - **Scene Management**:
   - Create new scenes with specified root node types
   - Add nodes to existing scenes with customizable properties
@@ -144,6 +145,7 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
         "get_runtime_state",
         "find_node",
         "invoke_node_action",
+        "capture_screenshot",
         "change_scene"
       ]
     }
@@ -246,7 +248,27 @@ Runtime control requires the managed runtime bridge addon in the target project:
 1. Install it with `install_runtime_bridge`.
 2. Check or maintain it with `get_runtime_bridge_status`, `update_runtime_bridge`, or `uninstall_runtime_bridge`.
 3. Start the game with `run_project` and `runtimeControl: true`.
-4. Use `get_runtime_state`, `find_node`, `invoke_node_action`, and `change_scene` against the running session.
+4. Use `get_runtime_state`, `find_node`, `invoke_node_action`, `change_scene`, and `capture_screenshot` against the running session.
+
+### Runtime Screenshot Capture
+
+`capture_screenshot` requires an active rendered game session started with runtime control and an up-to-date managed runtime bridge. If an installed bridge is older than the server, run `update_runtime_bridge` before starting the session. Headless sessions cannot capture screenshots.
+
+The tool always returns the captured `image/png`, even when an optional persistence write fails. The input is closed: use `{}` to return the image without saving, or choose one managed destination:
+
+```json
+{}
+```
+
+```json
+{ "saveTo": "temporary" }
+```
+
+```json
+{ "saveTo": "project" }
+```
+
+Temporary captures use a per-server managed directory beneath the operating system's temporary directory and are removed on normal server shutdown. Project captures use the authenticated active project path, which is fixed rather than caller-supplied; they are written as unique non-overwriting PNGs beneath `.godot-mcp/captures/`, with `.godot-mcp/.gdignore` created and symlink escapes refused. Project captures persist until removed. Callers cannot provide paths or filenames. PNG captures are limited to 16 MiB.
 
 
 ## Architecture

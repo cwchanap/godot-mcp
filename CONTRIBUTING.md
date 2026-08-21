@@ -100,9 +100,10 @@ The following tools have been recently added:
   - Helps LLMs understand the organization of Godot projects
   
 - **capture_screenshot**: Takes a screenshot of a running Godot project
-  - Requires an active Godot process
-  - Saves the screenshot to the specified path
-  - Useful for visual debugging and feedback
+  - Requires an active rendered Godot process with runtime control and the current managed bridge
+  - Accepts only the optional `saveTo` value `"temporary"` or `"project"`; omit it to return the image without saving
+  - Uses server-managed temporary storage or `<active-project>/.godot-mcp/captures/` for persistence
+  - Callers cannot supply output paths or filenames, and the image is still returned if persistence fails
 
 Example:
 
