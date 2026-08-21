@@ -343,6 +343,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -356,14 +357,16 @@ describe('ToolHandlers runtime launch plumbing', () => {
 
     const stopOrder: string[] = [];
     process.kill.mockImplementation(() => { stopOrder.push('kill'); });
-    runtimeManager.stopSession.mockImplementation(async () => {
-      stopOrder.push('stopSession');
+    runtimeManager.cleanup.mockImplementation(async () => {
+      stopOrder.push('cleanup');
     });
 
     await handlers.cleanup();
 
-    // Process should be killed before stopSession is awaited
-    expect(stopOrder).toEqual(['kill', 'stopSession']);
+    // Process should be killed before the manager performs shutdown cleanup.
+    expect(stopOrder).toEqual(['kill', 'cleanup']);
+    expect(runtimeManager.cleanup).toHaveBeenCalled();
+    expect(runtimeManager.stopSession).not.toHaveBeenCalled();
     expect((handlers as any).activeProcess).toBeNull();
   });
 

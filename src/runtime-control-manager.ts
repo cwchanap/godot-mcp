@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync } from 'node:fs';
-import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type Socket } from 'node:net';
-import { dirname, join, normalize, parse, resolve } from 'path';
+import { tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, normalize, parse, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import {
   MAX_RUNTIME_MESSAGE_BYTES,
@@ -122,6 +123,7 @@ export class RuntimeControlManager {
   private runtimeState: RuntimeState = { connected: false, sessionId: null, scenePath: null };
   private connectionStatus: RuntimeConnectionStatus = 'idle';
   private screenshotCaptureInFlight = false;
+  private temporaryCaptureDirectory: string | null = null;
 
   constructor(options: RuntimeControlManagerOptions = {}) {
     this.runtimeBridgeAssetsDir = options.runtimeBridgeAssetsDir ?? join(__dirname, '..', 'build', 'scripts');
@@ -261,8 +263,8 @@ export class RuntimeControlManager {
     if (this.screenshotCaptureInFlight) {
       throw new Error('Screenshot capture already in progress.');
     }
-    if (saveTo !== undefined) {
-      throw new Error('Screenshot persistence is not available yet.');
+    if (saveTo !== undefined && saveTo !== 'temporary' && saveTo !== 'project') {
+      throw new Error('Screenshot save destination must be "temporary" or "project".');
     }
 
     this.screenshotCaptureInFlight = true;
@@ -276,7 +278,7 @@ export class RuntimeControlManager {
         throw new Error(response.error ?? 'Screenshot capture failed.');
       }
       const screenshot = validateScreenshotPayload(response.result);
-      return {
+      const captureResult = {
         data: screenshot.data,
         mimeType: screenshot.mimeType,
         width: screenshot.width,
@@ -285,6 +287,27 @@ export class RuntimeControlManager {
         savedPath: null,
         saveError: null,
       };
+
+      if (saveTo === undefined) {
+        return captureResult;
+      }
+
+      try {
+        const captureDirectory = saveTo === 'temporary'
+          ? await this.getTemporaryCaptureDirectory()
+          : await this.getProjectCaptureDirectory();
+        const savedPath = join(captureDirectory, this.createScreenshotFileName());
+        await writeFile(savedPath, screenshot.bytes, { flag: 'wx' });
+        return {
+          ...captureResult,
+          savedPath,
+        };
+      } catch (error) {
+        return {
+          ...captureResult,
+          saveError: error instanceof Error ? error.message : 'Failed to save screenshot.',
+        };
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Screenshot capture failed.';
       if (/timed out/i.test(message)) {
@@ -293,6 +316,15 @@ export class RuntimeControlManager {
       throw error;
     } finally {
       this.screenshotCaptureInFlight = false;
+    }
+  }
+
+  async cleanup(): Promise<void> {
+    await this.stopSession();
+    const temporaryCaptureDirectory = this.temporaryCaptureDirectory;
+    this.temporaryCaptureDirectory = null;
+    if (temporaryCaptureDirectory) {
+      await rm(temporaryCaptureDirectory, { recursive: true, force: true });
     }
   }
 
@@ -407,6 +439,84 @@ export class RuntimeControlManager {
 
   private async copyBridgeAsset(sourcePath: string, destinationPath: string): Promise<void> {
     await copyFile(sourcePath, destinationPath);
+  }
+
+  private createScreenshotFileName(): string {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return `screenshot-${timestamp}-${randomUUID()}.png`;
+  }
+
+  private async getTemporaryCaptureDirectory(): Promise<string> {
+    if (!this.temporaryCaptureDirectory) {
+      this.temporaryCaptureDirectory = await mkdtemp(join(tmpdir(), 'godot-mcp-captures-'));
+    }
+    return this.temporaryCaptureDirectory;
+  }
+
+  private async getProjectCaptureDirectory(): Promise<string> {
+    const projectPath = this.activeRuntimeSession?.expectedProjectPath;
+    if (!projectPath) {
+      throw new Error('Active runtime project path is unavailable.');
+    }
+
+    const canonicalProjectPath = await realpath(projectPath);
+    const managedDirectory = join(projectPath, '.godot-mcp');
+    const captureDirectory = join(managedDirectory, 'captures');
+    await this.ensureManagedDirectory(managedDirectory);
+    await this.ensureManagedDirectory(captureDirectory);
+
+    const resolvedCaptureDirectory = await realpath(captureDirectory);
+    const relativeCaptureDirectory = relative(canonicalProjectPath, resolvedCaptureDirectory);
+    if (
+      isAbsolute(relativeCaptureDirectory) ||
+      relativeCaptureDirectory === '..' ||
+      relativeCaptureDirectory.startsWith(`..${sep}`)
+    ) {
+      throw new Error('Screenshot capture path must remain inside the active project.');
+    }
+
+    const gdignorePath = join(managedDirectory, '.gdignore');
+    try {
+      const gdignoreStats = await lstat(gdignorePath);
+      if (gdignoreStats.isSymbolicLink()) {
+        throw new Error('Screenshot project path contains a symbolic link.');
+      }
+    } catch (error) {
+      if (!this.isFileNotFoundError(error)) {
+        throw error;
+      }
+    }
+    await writeFile(gdignorePath, '', { flag: 'a' });
+
+    return resolvedCaptureDirectory;
+  }
+
+  private async ensureManagedDirectory(directoryPath: string): Promise<void> {
+    let stats;
+    try {
+      stats = await lstat(directoryPath);
+    } catch (error) {
+      if (!this.isFileNotFoundError(error)) {
+        throw error;
+      }
+      await mkdir(directoryPath);
+      stats = await lstat(directoryPath);
+    }
+    if (stats.isSymbolicLink()) {
+      throw new Error('Screenshot project path contains a symbolic link.');
+    }
+    if (!stats.isDirectory()) {
+      throw new Error('Screenshot project path is not a directory.');
+    }
+  }
+
+  private isFileNotFoundError(error: unknown): boolean {
+    return Boolean(
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    );
   }
 
   private async updateProjectAutoload(projectPath: string, update: (projectText: string) => string): Promise<void> {

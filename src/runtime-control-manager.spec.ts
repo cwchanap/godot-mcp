@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuntimeControlManager } from './runtime-control-manager.js';
 import { MAX_RUNTIME_MESSAGE_BYTES, MAX_SCREENSHOT_PNG_BYTES } from './screenshot-payload.js';
 import { createNearLimitPng, createOnePixelPng } from './test-helpers/png-fixture.js';
+import type { ScreenshotCaptureResult, ScreenshotSaveDestination } from './types.js';
 
 const projectPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control-project');
 const generatedAssetsPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control-assets');
@@ -169,6 +170,28 @@ describe('RuntimeControlManager', () => {
     });
     await expect(readJsonLine(socket)).resolves.toMatchObject({ ok: true });
     return { manager, socket };
+  }
+
+  async function captureThroughFakeBridge(
+    manager: RuntimeControlManager,
+    socket: Socket,
+    saveTo: ScreenshotSaveDestination
+  ): Promise<{ result: ScreenshotCaptureResult; png: Buffer }> {
+    const png = createOnePixelPng();
+    const capture = manager.captureScreenshot(saveTo);
+    const request = await readJsonLine(socket);
+    await writeJsonLine(socket, {
+      requestId: request.requestId,
+      ok: true,
+      result: {
+        pngBase64: png.toString('base64'),
+        mimeType: 'image/png',
+        width: 1,
+        height: 1,
+        byteLength: png.length,
+      },
+    });
+    return { result: await capture, png };
   }
 
   it('reports no active runtime session before launch', () => {
@@ -512,6 +535,90 @@ describe('RuntimeControlManager', () => {
     });
     await closeBridgeClient(socket);
     await manager.stopSession();
+  });
+
+  it('persists temporary and project captures from validated PNG bytes', async () => {
+    const { manager, socket } = await connectRealManager(projectPath);
+
+    try {
+      const temporary = await captureThroughFakeBridge(manager, socket, 'temporary');
+      expect(temporary.result.savedPath).toMatch(/godot-mcp-captures-/);
+      expect(await readFile(temporary.result.savedPath as string)).toEqual(temporary.png);
+      expect(temporary.result.saveError).toBeNull();
+
+      const project = await captureThroughFakeBridge(manager, socket, 'project');
+      expect(project.result.savedPath).toContain(path.join(projectPath, '.godot-mcp', 'captures'));
+      expect(await readFile(project.result.savedPath as string)).toEqual(project.png);
+      expect(await readFile(path.join(projectPath, '.godot-mcp', '.gdignore'), 'utf8')).toBe('');
+      expect(project.result.saveError).toBeNull();
+    } finally {
+      await closeBridgeClient(socket);
+      await manager.stopSession();
+    }
+  });
+
+  it('preserves the valid image when the project persistence root is a file', async () => {
+    await writeFile(path.join(projectPath, '.godot-mcp'), 'not a directory');
+    const { manager, socket } = await connectRealManager(projectPath);
+
+    try {
+      const project = await captureThroughFakeBridge(manager, socket, 'project');
+      expect(project.result.data).toBe(project.png.toString('base64'));
+      expect(project.result.savedPath).toBeNull();
+      expect(project.result.saveError).toBeTruthy();
+    } finally {
+      await closeBridgeClient(socket);
+      await manager.stopSession();
+    }
+  });
+
+  it('does not truncate an existing project gdignore file', async () => {
+    const managedDirectory = path.join(projectPath, '.godot-mcp');
+    await mkdir(managedDirectory, { recursive: true });
+    await writeFile(path.join(managedDirectory, '.gdignore'), 'existing-ignore\n');
+    const { manager, socket } = await connectRealManager(projectPath);
+
+    try {
+      const project = await captureThroughFakeBridge(manager, socket, 'project');
+      expect(project.result.savedPath).toContain(path.join(projectPath, '.godot-mcp', 'captures'));
+      await expect(readFile(path.join(managedDirectory, '.gdignore'), 'utf8')).resolves.toBe('existing-ignore\n');
+    } finally {
+      await closeBridgeClient(socket);
+      await manager.stopSession();
+    }
+  });
+
+  it('preserves the valid image and refuses an outside project symlink', async () => {
+    const outsidePath = path.join(process.cwd(), '.test-artifacts', 'runtime-capture-outside');
+    await rm(outsidePath, { recursive: true, force: true });
+    await mkdir(outsidePath, { recursive: true });
+    await symlink(outsidePath, path.join(projectPath, '.godot-mcp'));
+    const { manager, socket } = await connectRealManager(projectPath);
+
+    try {
+      const project = await captureThroughFakeBridge(manager, socket, 'project');
+      expect(project.result.data).toBe(project.png.toString('base64'));
+      expect(project.result.savedPath).toBeNull();
+      expect(project.result.saveError).toBeTruthy();
+      await expect(readFile(path.join(outsidePath, 'captures', 'screenshot.png'))).rejects.toThrow();
+    } finally {
+      await closeBridgeClient(socket);
+      await manager.stopSession();
+      await rm(outsidePath, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps temporary captures through stopSession and removes them on cleanup', async () => {
+    const { manager, socket } = await connectRealManager(projectPath);
+    const temporary = await captureThroughFakeBridge(manager, socket, 'temporary');
+    const savedPath = temporary.result.savedPath as string;
+    const captureDirectory = path.dirname(savedPath);
+
+    await manager.stopSession();
+    await expect(readFile(savedPath)).resolves.toEqual(temporary.png);
+    await manager.cleanup();
+    await expect(readFile(savedPath)).rejects.toThrow();
+    await expect(readFile(captureDirectory)).rejects.toThrow();
   });
 
   it('keeps the bridge connected after a screenshot timeout and permits retry', async () => {
