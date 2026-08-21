@@ -4,6 +4,7 @@ extends Node
 # version from package.json.  Do not edit this literal manually.
 const BRIDGE_VERSION := "__PACKAGE_VERSION__"
 const MCP_HOST := "127.0.0.1"
+const MAX_SCREENSHOT_PNG_BYTES := 16 * 1024 * 1024
 
 var _client := StreamPeerTCP.new()
 var _receive_buffer := ""
@@ -11,6 +12,7 @@ var _port := 0
 var _token := ""
 var _session_id := ""
 var _hello_sent := false
+var _screenshot_capture_in_flight := false
 
 func _ready() -> void:
     _read_launch_configuration()
@@ -72,8 +74,11 @@ func _send_message(message: Dictionary) -> void:
     if _client.get_status() != StreamPeerTCP.STATUS_CONNECTED:
         return
 
-    var payload := JSON.stringify(message) + "\n"
-    _client.put_data(payload.to_utf8_buffer())
+    var payload := (JSON.stringify(message) + "\n").to_utf8_buffer()
+    var error := _client.put_data(payload)
+    if error != OK:
+        push_warning("Godot MCP runtime bridge failed to send response: %s" % error_string(error))
+        _client.disconnect_from_host()
 
 func _read_messages() -> void:
     var available_bytes := _client.get_available_bytes()
@@ -102,7 +107,7 @@ func _handle_raw_message(raw_message: String) -> void:
     if not message.has("command"):
         return
 
-    var response := _handle_command(message)
+    var response: Dictionary = await _handle_command(message)
     if message.has("requestId"):
         response["requestId"] = message["requestId"]
     _send_message(response)
@@ -115,8 +120,56 @@ func _handle_command(message: Dictionary) -> Dictionary:
             return _change_scene(message.get("scenePath", ""))
         "invoke_node_action":
             return _invoke_node_action(message.get("nodePath", ""), message.get("action", ""))
+        "capture_screenshot":
+            return await _capture_screenshot()
         _:
             return {"ok": false, "error": "Unsupported command"}
+
+func _capture_screenshot() -> Dictionary:
+    if _screenshot_capture_in_flight:
+        return {"ok": false, "error": "Screenshot capture already in progress"}
+
+    _screenshot_capture_in_flight = true
+    var response := await _capture_screenshot_frame()
+    _screenshot_capture_in_flight = false
+    return response
+
+func _capture_screenshot_frame() -> Dictionary:
+    if DisplayServer.get_name() == "headless":
+        return {"ok": false, "error": "Screenshot capture requires a rendered game session"}
+
+    await RenderingServer.frame_post_draw
+    var viewport := get_viewport()
+    var texture := viewport.get_texture()
+    var image := texture.get_image()
+    if image == null or image.is_empty():
+        return {"ok": false, "error": "No rendered viewport frame was available"}
+
+    if viewport.use_hdr_2d:
+        image.convert(Image.FORMAT_RGBA8)
+        image.linear_to_srgb()
+    elif image.get_format() != Image.FORMAT_RGBA8:
+        image.convert(Image.FORMAT_RGBA8)
+
+    var png := image.save_png_to_buffer()
+    if png.is_empty():
+        return {"ok": false, "error": "Failed to encode viewport as PNG"}
+    if png.size() > MAX_SCREENSHOT_PNG_BYTES:
+        return {
+            "ok": false,
+            "error": "Screenshot PNG exceeds the 16 MiB limit",
+        }
+
+    return {
+        "ok": true,
+        "result": {
+            "pngBase64": Marshalls.raw_to_base64(png),
+            "mimeType": "image/png",
+            "width": image.get_width(),
+            "height": image.get_height(),
+            "byteLength": png.size(),
+        }
+    }
 
 # The MCP tool accepts node paths in the form "root/Node" for convenience
 # (matching the display convention), but Godot's SceneTree uses "/root/Node".
