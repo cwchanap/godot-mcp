@@ -21,7 +21,6 @@ interface OperationToolOptions {
 }
 
 type RuntimeToolManager = RuntimeBridgeManager & {
-  cleanup?: () => Promise<void>;
   getRuntimeState(): RuntimeState;
   findNode(nodePath: string): Promise<unknown>;
   changeScene(scenePath: string): Promise<unknown>;
@@ -126,11 +125,7 @@ export class ToolHandlers {
       this.activeProcess = null;
     }
 
-    if (this.runtimeControlManager.cleanup) {
-      await this.runtimeControlManager.cleanup();
-    } else {
-      await this.runtimeControlManager.stopSession();
-    }
+    await this.runtimeControlManager.cleanup();
   }
 
   /**

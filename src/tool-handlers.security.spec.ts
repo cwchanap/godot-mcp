@@ -6,7 +6,7 @@ function createHandlers(): ToolHandlers {
   return new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
     { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
     { normalizeParameters: (args: unknown) => args },
-    {}
+    { cleanup: async () => {} }
   );
 }
 

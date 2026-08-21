@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readFile, readdir, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { Socket, createConnection } from 'node:net';
 import path from 'path';
@@ -600,7 +600,8 @@ describe('RuntimeControlManager', () => {
       expect(project.result.data).toBe(project.png.toString('base64'));
       expect(project.result.savedPath).toBeNull();
       expect(project.result.saveError).toBeTruthy();
-      await expect(readFile(path.join(outsidePath, 'captures', 'screenshot.png'))).rejects.toThrow();
+      await expect(lstat(path.join(outsidePath, 'captures'))).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readdir(outsidePath)).resolves.toEqual([]);
     } finally {
       await closeBridgeClient(socket);
       await manager.stopSession();
@@ -618,7 +619,7 @@ describe('RuntimeControlManager', () => {
     await expect(readFile(savedPath)).resolves.toEqual(temporary.png);
     await manager.cleanup();
     await expect(readFile(savedPath)).rejects.toThrow();
-    await expect(readFile(captureDirectory)).rejects.toThrow();
+    await expect(lstat(captureDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('keeps the bridge connected after a screenshot timeout and permits retry', async () => {

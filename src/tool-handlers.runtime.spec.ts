@@ -1,7 +1,7 @@
 import { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 const { existsSyncMock, execFileMock, spawnMock } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
@@ -24,6 +24,7 @@ vi.mock('child_process', () => ({
 
 import { GodotServer } from './godot-server.js';
 import { ToolHandlers } from './tool-handlers.js';
+import type { RuntimeBridgeManager } from './types.js';
 
 const projectPath = '/workspace/project';
 
@@ -100,6 +101,10 @@ describe('ToolHandlers runtime launch plumbing', () => {
     spawnMock.mockReturnValue(createSpawnedProcess());
   });
 
+  it('requires cleanup in the runtime manager contract', () => {
+    expectTypeOf<RuntimeBridgeManager>().toHaveProperty('cleanup');
+  });
+
   it('starts runtime control only when runtimeControl is true', async () => {
     const runtimeManager = {
       startSession: vi.fn().mockResolvedValue({
@@ -108,6 +113,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-1',
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -131,6 +137,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-1',
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -160,6 +167,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: false, version: null, compatible: false }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -178,6 +186,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '0.0.1-stale', compatible: false }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -196,6 +205,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: false, version: null, compatible: false }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -229,6 +239,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-2',
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -267,6 +278,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -283,6 +295,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
+      cleanup: vi.fn().mockResolvedValue(undefined),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -298,6 +311,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
+      cleanup: vi.fn().mockResolvedValue(undefined),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -319,6 +333,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-2',
       }),
       stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -378,6 +393,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
         sessionId: 'session-1',
       }),
       stopSession: vi.fn().mockRejectedValue(new Error('stopSession boom')),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -398,6 +414,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getBridgeStatus: vi.fn().mockRejectedValue(new Error('EACCES: permission denied')),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
@@ -484,6 +501,7 @@ describe('ToolHandlers runtime command delegation', () => {
     const runtimeManager = {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
       getRuntimeState: vi.fn().mockReturnValue({
         connected: true,
         sessionId: 'session-1',
@@ -666,6 +684,7 @@ describe('ToolHandlers runtime bridge project validation', () => {
       const runtimeManager = {
         startSession: vi.fn(),
         stopSession: vi.fn().mockResolvedValue(undefined),
+        cleanup: vi.fn().mockResolvedValue(undefined),
         installBridge: vi.fn(),
         getBridgeStatus: vi.fn(),
         updateBridge: vi.fn(),

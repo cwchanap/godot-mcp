@@ -111,6 +111,7 @@ export interface ScreenshotCaptureResult {
 export interface RuntimeControlSessionManager {
   startSession(projectPath: string): Promise<RuntimeLaunchSession>;
   stopSession(): Promise<void>;
+  cleanup(): Promise<void>;
 }
 
 export interface RuntimeBridgeManager extends RuntimeControlSessionManager {
