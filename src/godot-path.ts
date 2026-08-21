@@ -5,9 +5,9 @@
 import { normalize } from 'path';
 import { existsSync } from 'fs';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class GodotPathManager {
   private validatedPaths: Map<string, boolean> = new Map();
@@ -40,7 +40,7 @@ export class GodotPathManager {
    */
   private logDebug(message: string): void {
     if (process.env.DEBUG === 'true') {
-      console.debug(`[GODOT-PATH] ${message}`);
+      console.error(`[GODOT-PATH] ${message}`);
     }
   }
 
@@ -77,8 +77,7 @@ export class GodotPathManager {
       }
 
       // Try to execute Godot with --version flag
-      const command = path === 'godot' ? 'godot --version' : `"${path}" --version`;
-      await execAsync(command);
+      await execFileAsync(path, ['--version']);
 
       this.logDebug(`Valid Godot path: ${path}`);
       this.validatedPaths.set(path, true);

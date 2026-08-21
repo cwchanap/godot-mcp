@@ -1,7 +1,24 @@
 {
   "name": "godot-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for interfacing with Godot game engine. Provides tools for launching the editor, running projects, and capturing debug output.",
+  "keywords": [
+    "godot",
+    "mcp",
+    "ai",
+    "claude",
+    "cline"
+  ],
+  "homepage": "https://github.com/Coding-Solo/godot-mcp",
+  "bugs": {
+    "url": "https://github.com/Coding-Solo/godot-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Coding-Solo/godot-mcp.git"
+  },
+  "license": "MIT",
+  "author": "Solomon Elias <solomon@sippy.ai>",
   "type": "module",
   "bin": {
     "godot-mcp": "./build/index.js"
@@ -13,9 +30,9 @@
     "build": "npm run typecheck && tsc -p tsconfig.build.json && node scripts/build.js",
     "test": "vitest run",
     "test:watch": "vitest watch",
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build"
   },
@@ -30,18 +47,6 @@
     "vite": "^7.1.5",
     "vitest": "^3.2.4"
   },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Coding-Solo/godot-mcp.git"
-  },
-  "keywords": [
-    "godot",
-    "mcp",
-    "ai",
-    "claude",
-    "cline"
-  ],
   "main": "./build/index.js",
   "module": "./build/index.js",
   "types": "./build/index.d.ts",

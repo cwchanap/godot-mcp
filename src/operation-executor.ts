@@ -3,12 +3,12 @@
  */
 
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { dirname, join } from 'path';
 import { OperationParams, PARAMETER_MAPPINGS } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface OperationExecutionOptions {
   useEditor?: boolean;
@@ -34,7 +34,7 @@ export class OperationExecutor {
    */
   private logDebug(message: string): void {
     if (process.env.DEBUG === 'true') {
-      console.debug(`[OPERATION-EXECUTOR] ${message}`);
+      console.error(`[OPERATION-EXECUTOR] ${message}`);
     }
   }
 
@@ -79,8 +79,8 @@ export class OperationExecutor {
       if (Object.prototype.hasOwnProperty.call(params, key)) {
         // Convert camelCase to snake_case
         const snakeKey = this.reverseParameterMappings[key] || key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-
         const value = params[key];
+
         // Handle nested objects and arrays recursively
         if (Array.isArray(value)) {
           result[snakeKey] = value.map((item) => {
@@ -118,11 +118,11 @@ export class OperationExecutor {
     this.logDebug(`Converted snake_case params: ${JSON.stringify(snakeCaseParams)}`);
 
     // Ensure godotPath is set
-    const godotPath = pathManager.getPath();
+    let godotPath = pathManager.getPath();
     if (!godotPath) {
       await pathManager.detectGodotPath();
-      const newPath = pathManager.getPath();
-      if (!newPath) {
+      godotPath = pathManager.getPath();
+      if (!godotPath) {
         throw new Error('Could not find a valid Godot executable path');
       }
     }
@@ -130,62 +130,48 @@ export class OperationExecutor {
     try {
       // Serialize the snake_case parameters to a valid JSON string
       const paramsJson = JSON.stringify(snakeCaseParams);
-      // Escape single quotes in the JSON string to prevent command injection
-      const escapedParams = paramsJson.replace(/'/g, "'\\'");
-      // On Windows, cmd.exe does not strip single quotes, so we use
-      // double quotes and escape them to ensure the JSON is parsed
-      // correctly by Godot.
-      const isWindows = process.platform === 'win32';
-      const quotedParams = isWindows
-        ? `\\"${paramsJson.replace(/\"/g, '\\"')}\"`
-        : `'${escapedParams}'`;
-
-      // Add debug arguments if debug mode is enabled
-      const debugArgs = process.env.GODOT_DEBUG_MODE === 'true' ? ['--debug-godot'] : [];
-
-      let cmdParts: string[] = [];
+      let commandArgs: string[];
 
       if (options.useEditor) {
-        cmdParts = [
-          `"${godotPath}"`,
+        commandArgs = [
           '--headless',
           '--editor',
           '--quit',
           '--path',
-          `"${projectPath}"`,
+          projectPath,
           '--script',
-          `"${this.editorOperationsScriptPath}"`,
+          this.editorOperationsScriptPath,
           operation,
-          quotedParams,
+          paramsJson,
         ];
       } else {
         // Default to regular operations script
-        cmdParts = [
-          `"${godotPath}"`,
+        commandArgs = [
           '--headless',
           '--path',
-          `"${projectPath}"`,
+          projectPath,
           '--script',
-          `"${this.operationsScriptPath}"`,
+          this.operationsScriptPath,
           operation,
-          quotedParams,
+          paramsJson,
         ];
       }
 
-      const cmd = [...cmdParts, ...debugArgs].join(' ');
+      if (process.env.GODOT_DEBUG_MODE === 'true') {
+        commandArgs.push('--debug-godot');
+      }
 
-      this.logDebug(`Command: ${cmd}`);
+      this.logDebug(`Executing: ${godotPath} ${commandArgs.join(' ')}`);
 
-      const { stdout, stderr } = await execAsync(cmd);
-
-      return { stdout, stderr };
+      const { stdout, stderr } = await execFileAsync(godotPath, commandArgs);
+      return { stdout: stdout ?? '', stderr: stderr ?? '' };
     } catch (error: unknown) {
-      // If execAsync throws, it still contains stdout/stderr
+      // If execFileAsync throws, it still contains stdout/stderr
       if (error instanceof Error && 'stdout' in error && 'stderr' in error) {
         const execError = error as Error & { stdout: string; stderr: string };
         return {
-          stdout: execError.stdout,
-          stderr: execError.stderr,
+          stdout: execError.stdout ?? '',
+          stderr: execError.stderr ?? '',
         };
       }
 

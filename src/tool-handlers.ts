@@ -4,15 +4,14 @@
 
 import { join, basename } from 'path';
 import { existsSync } from 'fs';
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
-import { exec } from 'child_process';
 import type { GodotProcess, RuntimeBridgeManager, RuntimeState } from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { ProjectUtils } from './project-utils.js';
 import { OperationExecutor } from './operation-executor.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface OperationToolOptions {
   expectsJson?: boolean;
@@ -49,8 +48,12 @@ export class ToolHandlers {
    */
   private logDebug(message: string): void {
     if (process.env.DEBUG === 'true') {
-      console.debug(`[TOOL-HANDLERS] ${message}`);
+      console.error(`[TOOL-HANDLERS] ${message}`);
     }
+  }
+
+  private validateClassName(name: string): boolean {
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
   }
 
   /**
@@ -731,7 +734,7 @@ export class ToolHandlers {
       }
 
       this.logDebug('Getting Godot version');
-      const { stdout } = await execAsync(`"${this.pathManager.getPath()}" --version`);
+      const { stdout } = await execFileAsync(this.pathManager.getPath()!, ['--version']);
       return {
         content: [
           {
@@ -857,7 +860,7 @@ export class ToolHandlers {
 
       // Get Godot version
       const execOptions = { timeout: 10000 }; // 10 second timeout
-      const { stdout } = await execAsync(`"${this.pathManager.getPath()}" --version`, execOptions);
+      const { stdout } = await execFileAsync(this.pathManager.getPath()!, ['--version'], execOptions);
 
       // Get project structure using the recursive method
       const projectStructure = await ProjectUtils.getProjectStructureAsync(args.projectPath);
@@ -916,6 +919,14 @@ export class ToolHandlers {
       );
     }
 
+    const rootNodeType = args.rootNodeType || 'Node2D';
+    if (!this.validateClassName(rootNodeType)) {
+      return this.createErrorResponse(
+        'Invalid rootNodeType',
+        ['rootNodeType must be a built-in Godot class name (no paths, no file extensions)']
+      );
+    }
+
     try {
       if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
         return this.createErrorResponse(
@@ -929,7 +940,7 @@ export class ToolHandlers {
 
       const params = {
         scenePath: args.scenePath,
-        rootNodeType: args.rootNodeType || 'Node2D',
+        rootNodeType,
       };
 
       const { stdout, stderr } = await this.operationExecutor.executeOperation('create_scene', params, args.projectPath, this.pathManager);
@@ -982,6 +993,13 @@ export class ToolHandlers {
       return this.createErrorResponse(
         'Invalid path',
         ['Provide valid paths without ".." or other potentially unsafe characters']
+      );
+    }
+
+    if (!this.validateClassName(args.nodeType)) {
+      return this.createErrorResponse(
+        'Invalid nodeType',
+        ['nodeType must be a built-in Godot class name (no paths, no file extensions)']
       );
     }
 
@@ -1271,7 +1289,7 @@ export class ToolHandlers {
         await this.pathManager.detectGodotPath();
       }
 
-      const { stdout: versionOutput } = await execAsync(`"${this.pathManager.getPath()}" --version`);
+      const { stdout: versionOutput } = await execFileAsync(this.pathManager.getPath()!, ['--version']);
       const version = versionOutput.trim();
 
       if (!ProjectUtils.isGodot44OrLater(version)) {
@@ -1306,7 +1324,7 @@ export class ToolHandlers {
         await this.pathManager.detectGodotPath();
       }
 
-      const { stdout: versionOutput } = await execAsync(`"${this.pathManager.getPath()}" --version`);
+      const { stdout: versionOutput } = await execFileAsync(this.pathManager.getPath()!, ['--version']);
       const version = versionOutput.trim();
 
       if (!ProjectUtils.isGodot44OrLater(version)) {

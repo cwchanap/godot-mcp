@@ -1,4 +1,3 @@
-
 # Godot MCP
 
 [![Github-sponsors](https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=#EA4AAA)](https://github.com/sponsors/Coding-Solo)
@@ -13,53 +12,52 @@
 [![](https://img.shields.io/github/forks/Coding-Solo/godot-mcp 'Forks')](https://github.com/Coding-Solo/godot-mcp/network/members)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
-```text
-                           (((((((             (((((((                          
-                        (((((((((((           (((((((((((                      
-                        (((((((((((((       (((((((((((((                       
-                        (((((((((((((((((((((((((((((((((                       
-                        (((((((((((((((((((((((((((((((((                       
-         (((((      (((((((((((((((((((((((((((((((((((((((((      (((((        
-       (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((      
-     ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((    
-    ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((    
-      (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((     
-        (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((       
-         (((((((((((@@@@@@@(((((((((((((((((((((((((((@@@@@@@(((((((((((        
-         (((((((((@@@@,,,,,@@@(((((((((((((((((((((@@@,,,,,@@@@(((((((((        
-         ((((((((@@@,,,,,,,,,@@(((((((@@@@@(((((((@@,,,,,,,,,@@@((((((((        
-         ((((((((@@@,,,,,,,,,@@(((((((@@@@@(((((((@@,,,,,,,,,@@@((((((((        
-         (((((((((@@@,,,,,,,@@((((((((@@@@@((((((((@@,,,,,,,@@@(((((((((        
-         ((((((((((((@@@@@@(((((((((((@@@@@(((((((((((@@@@@@((((((((((((        
-         (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((        
-         (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((        
-         @@@@@@@@@@@@@((((((((((((@@@@@@@@@@@@@((((((((((((@@@@@@@@@@@@@        
-         ((((((((( @@@(((((((((((@@(((((((((((@@(((((((((((@@@ (((((((((        
-         (((((((((( @@((((((((((@@@(((((((((((@@@((((((((((@@ ((((((((((        
-          (((((((((((@@@@@@@@@@@@@@(((((((((((@@@@@@@@@@@@@@(((((((((((         
-           (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((          
-              (((((((((((((((((((((((((((((((((((((((((((((((((((((             
-                 (((((((((((((((((((((((((((((((((((((((((((((((                
-                        (((((((((((((((((((((((((((((((((                       
-                                                                                
 
-                          /$$      /$$  /$$$$$$  /$$$$$$$ 
+```text
+                           (((((((             (((((((
+                        (((((((((((           (((((((((((
+                        (((((((((((((       (((((((((((((
+                        (((((((((((((((((((((((((((((((((
+                        (((((((((((((((((((((((((((((((((
+         (((((      (((((((((((((((((((((((((((((((((((((((((      (((((
+       (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+     ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+    ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+      (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+        (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+         (((((((((((@@@@@@@(((((((((((((((((((((((((((@@@@@@@(((((((((((
+         (((((((((@@@@,,,,,@@@(((((((((((((((((((((@@@,,,,,@@@@(((((((((
+         ((((((((@@@,,,,,,,,,@@(((((((@@@@@(((((((@@,,,,,,,,,@@@((((((((
+         ((((((((@@@,,,,,,,,,@@(((((((@@@@@(((((((@@,,,,,,,,,@@@((((((((
+         (((((((((@@@,,,,,,,@@((((((((@@@@@((((((((@@,,,,,,,@@@(((((((((
+         ((((((((((((@@@@@@(((((((((((@@@@@(((((((((((@@@@@@((((((((((((
+         (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+         (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+         @@@@@@@@@@@@@((((((((((((@@@@@@@@@@@@@((((((((((((@@@@@@@@@@@@@
+         ((((((((( @@@(((((((((((@@(((((((((((@@(((((((((((@@@ (((((((((
+         (((((((((( @@((((((((((@@@(((((((((((@@@((((((((((@@ ((((((((((
+          (((((((((((@@@@@@@@@@@@@@(((((((((((@@@@@@@@@@@@@@(((((((((((
+           (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+              (((((((((((((((((((((((((((((((((((((((((((((((((((((
+                 (((((((((((((((((((((((((((((((((((((((((((((((
+                        (((((((((((((((((((((((((((((((((
+
+
+                          /$$      /$$  /$$$$$$  /$$$$$$$
                          | $$$    /$$$ /$$__  $$| $$__  $$
                          | $$$$  /$$$$| $$  \__/| $$  \ $$
                          | $$ $$/$$ $$| $$      | $$$$$$$/
-                         | $$  $$$| $$| $$      | $$____/ 
-                         | $$\  $ | $$| $$    $$| $$      
-                         | $$ \/  | $$|  $$$$$$/| $$      
-                         |__/     |__/ \______/ |__/       
+                         | $$  $$$| $$| $$      | $$____/
+                         | $$\  $ | $$| $$    $$| $$
+                         | $$ \/  | $$|  $$$$$$/| $$
+                         |__/     |__/ \______/ |__/
 ```
 
 A Model Context Protocol (MCP) server for interacting with the Godot game engine.
 
 ## Introduction
 
-Godot MCP enables AI assistants to launch the Godot editor, run projects, capture debug output, and control project execution - all through a standardized interface.
-
-This direct feedback loop helps AI assistants like Claude understand what works and what doesn't in real Godot projects, leading to better code generation and debugging assistance.
+Godot MCP enables AI agents to launch the Godot editor, run projects, capture debug output, and control project execution. This direct feedback loop helps agents understand what works and what doesn't in real Godot projects, leading to better code generation and debugging assistance.
 
 ## Features
 
@@ -90,35 +88,27 @@ This direct feedback loop helps AI assistants like Claude understand what works 
 ## Requirements
 
 - [Godot Engine](https://godotengine.org/download) installed on your system
-- Node.js and npm
-- An AI assistant that supports MCP (Cline, Cursor, etc.)
+- Node.js (>=18.18) and npm
+- An AI agent that supports MCP
 
-## Installation and Configuration
+## Quick Start
 
-### Step 1: Install and Build
-
-You can either run the published package directly with `npx` or build it from source.
-
-#### Option A: Run via npx
+### Claude Code
 
 ```bash
-npx godot-mcp
+claude mcp add godot -- npx @coding-solo/godot-mcp
 ```
 
-This downloads the CLI on demand, runs the server immediately, and keeps cached builds up to date. Set `GODOT_PATH` if your Godot executable is not on `PATH`.
+That's it. Restart Claude Code and your Godot MCP tools are available.
 
-#### Option B: Build from source
+With environment variables:
 
 ```bash
-git clone https://github.com/Coding-Solo/godot-mcp.git
-cd godot-mcp
-npm install
-npm run build
+claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx @coding-solo/godot-mcp
 ```
 
-### Step 2: Configure with Your AI Assistant
-
-#### Option A: Configure with Cline
+<details>
+<summary><strong>Cline</strong></summary>
 
 Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`):
 
@@ -126,10 +116,10 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
 {
   "mcpServers": {
     "godot": {
-      "command": "node",
-      "args": ["/absolute/path/to/godot-mcp/build/index.js"],
+      "command": "npx",
+      "args": ["@coding-solo/godot-mcp"],
       "env": {
-        "DEBUG": "true"                  // Optional: Enable detailed logging
+        "DEBUG": "true"
       },
       "disabled": false,
       "autoApprove": [
@@ -161,140 +151,129 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
 }
 ```
 
-#### Option B: Configure with Cursor
+</details>
+
+<details>
+<summary><strong>Cursor</strong></summary>
 
 **Using the Cursor UI:**
 
 1. Go to **Cursor Settings** > **Features** > **MCP**
 2. Click on the **+ Add New MCP Server** button
 3. Fill out the form:
-   - Name: `godot` (or any name you prefer)
+   - Name: `godot`
    - Type: `command`
-   - Command: `node /absolute/path/to/godot-mcp/build/index.js`
+   - Command: `npx @coding-solo/godot-mcp`
 4. Click "Add"
 5. You may need to press the refresh button in the top right corner of the MCP server card to populate the tool list
 
 **Using Project-Specific Configuration:**
 
-Create a file at `.cursor/mcp.json` in your project directory with the following content:
+Create a file at `.cursor/mcp.json` in your project directory:
 
 ```json
 {
   "mcpServers": {
     "godot": {
-      "command": "node",
-      "args": ["/absolute/path/to/godot-mcp/build/index.js"],
+      "command": "npx",
+      "args": ["@coding-solo/godot-mcp"],
       "env": {
-        "DEBUG": "true"                  // Enable detailed logging
+        "DEBUG": "true"
       }
     }
   }
 }
 ```
 
-### Step 3: Optional Environment Variables
+</details>
 
-You can customize the server behavior with these environment variables:
+<details>
+<summary><strong>Other MCP Clients</strong></summary>
 
-- `GODOT_PATH`: Path to the Godot executable (overrides automatic detection)
-- `DEBUG`: Set to "true" to enable detailed server-side debug logging
+For any MCP-compatible client, use this configuration:
 
-### Step 4: Optional Argument Configuration
+```json
+{
+  "mcpServers": {
+    "godot": {
+      "command": "npx",
+      "args": ["@coding-solo/godot-mcp"],
+      "env": {
+        "GODOT_PATH": "/path/to/godot",
+        "DEBUG": "true"
+      }
+    }
+  }
+}
+```
 
-When running the CLI directly or through an MCP host that supports `argumentConfig`, you can pass configuration without mutating environment variables:
+</details>
 
-- Provide the Godot path explicitly: `node build/index.js --godot-path /absolute/path/to/Godot`
-- Pass a JSON blob: `node build/index.js --config '{"godotPath":"/absolute/path/to/Godot"}'`
-- Provide an empty string or `null` in JSON (e.g. `{"godotPath":""}`) to clear a previously cached path and fall back to automatic detection
-- MCP hosts can send the same JSON via `argumentConfig`; the server reads from `MCP_ARGUMENT_CONFIG`, `MCP_SERVER_ARGUMENT_CONFIG`, or `MCP_CONFIG`
+### Environment Variables
 
-### Step 5: Runtime Control Setup
+| Variable | Description |
+|----------|-------------|
+| `GODOT_PATH` | Path to the Godot executable (overrides automatic detection) |
+| `DEBUG` | Set to `"true"` to enable detailed server-side debug logging |
 
-Runtime control depends on the managed runtime bridge addon being installed in the target project.
+<details>
+<summary><strong>Building from Source</strong></summary>
 
-Typical flow:
+```bash
+git clone https://github.com/Coding-Solo/godot-mcp.git
+cd godot-mcp
+npm install
+npm run build
+```
 
-1. Install the bridge with `install_runtime_bridge`.
-2. Optionally verify or maintain the install with `get_runtime_bridge_status`, `update_runtime_bridge`, or `uninstall_runtime_bridge`.
+Then point your MCP client to `build/index.js` instead of using `npx`.
+
+</details>
+
+### Argument Configuration
+
+When running the built CLI directly or through an MCP host that supports `argumentConfig`, configuration can be passed without changing environment variables:
+
+- Set the Godot path: `node build/index.js --godot-path /absolute/path/to/Godot`
+- Pass JSON: `node build/index.js --config '{"godotPath":"/absolute/path/to/Godot"}'`
+- Use an empty string or `null` for `godotPath` to clear a cached path and fall back to automatic detection
+- MCP hosts can send the same JSON through `MCP_ARGUMENT_CONFIG`, `MCP_SERVER_ARGUMENT_CONFIG`, or `MCP_CONFIG`
+
+### Runtime Control Setup
+
+Runtime control requires the managed runtime bridge addon in the target project:
+
+1. Install it with `install_runtime_bridge`.
+2. Check or maintain it with `get_runtime_bridge_status`, `update_runtime_bridge`, or `uninstall_runtime_bridge`.
 3. Start the game with `run_project` and `runtimeControl: true`.
 4. Use `get_runtime_state`, `find_node`, `invoke_node_action`, and `change_scene` against the running session.
 
-## Example Prompts
 
-Once configured, your AI assistant will automatically run the MCP server when needed. You can use prompts like:
-
-```text
-"Launch the Godot editor for my project at /path/to/project"
-
-"Run my Godot project and show me any errors"
-
-"Get information about my Godot project structure"
-
-"Analyze my Godot project structure and suggest improvements"
-
-"Help me debug this error in my Godot project: [paste error]"
-
-"Write a GDScript for a character controller with double jump and wall sliding"
-
-"Create a new scene with a Player node in my Godot project"
-
-"Add a Sprite2D node to my player scene and load the character texture"
-
-"Export my 3D models as a MeshLibrary for use with GridMap"
-
-"Create a UI scene with buttons and labels for my game's main menu"
-
-"Get the UID for a specific script file in my Godot 4.4 project"
-
-"Update UID references in my Godot project after upgrading to 4.4"
-
-"Install the runtime bridge for /path/to/project"
-
-"Show the runtime bridge status for /path/to/project"
-
-"Run my project with runtime control enabled"
-
-"Inspect the current runtime state for my running game"
-
-"Find node root/Menu/StartButton in the running game"
-
-"Press the button at root/Menu/StartButton in the running game"
-
-"Change the running game to res://Level2.tscn"
-```
-
-## Implementation Details
-
-### Architecture
+## Architecture
 
 The Godot MCP server uses a bundled GDScript approach for complex operations:
 
 1. **Direct Commands**: Simple operations like launching the editor or getting project info use Godot's built-in CLI commands directly.
 2. **Bundled Operations Script**: Complex operations like creating scenes or adding nodes use a single, comprehensive GDScript file (`godot_operations.gd`) that handles all operations.
 
-This architecture provides several benefits:
-
-- **No Temporary Files**: Eliminates the need for temporary script files, keeping your system clean
-- **Simplified Codebase**: Centralizes all Godot operations in one (somewhat) organized file
-- **Better Maintainability**: Makes it easier to add new operations or modify existing ones
-- **Improved Error Handling**: Provides consistent error reporting across all operations
-- **Reduced Overhead**: Minimizes file I/O operations for better performance
-
 The bundled script accepts operation type and parameters as JSON, allowing for flexible and dynamic operation execution without generating temporary files for each operation.
 
 ## Troubleshooting
 
-- **Godot Not Found**: Set the GODOT_PATH environment variable to your Godot executable
+- **Godot Not Found**: Set the `GODOT_PATH` environment variable to your Godot executable path
 - **Connection Issues**: Ensure the server is running and restart your AI assistant
-- **Invalid Project Path**: Ensure the path points to a directory containing a project.godot file
+- **Invalid Project Path**: Ensure the path points to a directory containing a `project.godot` file
 - **Build Issues**: Make sure all dependencies are installed by running `npm install`
-- **For Cursor Specifically**:
--   Ensure the MCP server shows up and is enabled in Cursor settings (Settings > MCP)
--   MCP tools can only be run using the Agent chat profile (Cursor Pro or Business subscription)
--   Use "Yolo Mode" to automatically run MCP tool requests
+
+<details>
+<summary><strong>Cursor-Specific Issues</strong></summary>
+
+- Ensure the MCP server shows up and is enabled in Cursor settings (Settings > MCP)
+- MCP tools can only be run using the Agent chat profile (Cursor Pro or Business subscription)
+- Use "Yolo Mode" to automatically run MCP tool requests
+
+</details>
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/coding-solo-godot-mcp-badge.png)](https://mseep.ai/app/coding-solo-godot-mcp)

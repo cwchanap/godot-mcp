@@ -83,7 +83,7 @@ export class GodotServer {
    */
   private async cleanup() {
     if (process.env.DEBUG === 'true') {
-      console.debug('[GODOT-SERVER] Cleaning up resources');
+      console.error('[GODOT-SERVER] Cleaning up resources');
     }
     await this.toolHandlers.cleanup();
     await this.server.close();
@@ -343,7 +343,6 @@ export class GodotServer {
               rootNodeType: {
                 type: 'string',
                 description: 'Type of the root node (e.g., Node2D, Node3D)',
-                default: 'Node2D',
               },
             },
             required: ['projectPath', 'scenePath'],
@@ -366,7 +365,6 @@ export class GodotServer {
               parentNodePath: {
                 type: 'string',
                 description: 'Path to the parent node (e.g., "root" or "root/Player")',
-                default: 'root',
               },
               nodeType: {
                 type: 'string',
@@ -854,7 +852,7 @@ export class GodotServer {
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (process.env.DEBUG === 'true') {
-        console.debug(`[GODOT-SERVER] Handling tool request: ${request.params.name}`);
+        console.error(`[GODOT-SERVER] Handling tool request: ${request.params.name}`);
       }
 
       switch (request.params.name) {

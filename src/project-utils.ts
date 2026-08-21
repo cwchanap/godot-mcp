@@ -12,7 +12,7 @@ export class ProjectUtils {
    */
   private static logDebug(message: string): void {
     if (process.env.DEBUG === 'true') {
-      console.debug(`[PROJECT-UTILS] ${message}`);
+      console.error(`[PROJECT-UTILS] ${message}`);
     }
   }
 

@@ -3,8 +3,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { existsSyncMock, spawnMock } = vi.hoisted(() => ({
+const { existsSyncMock, execFileMock, spawnMock } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
+  execFileMock: vi.fn(),
   spawnMock: vi.fn(),
 }));
 
@@ -17,7 +18,7 @@ vi.mock('fs', async () => {
 });
 
 vi.mock('child_process', () => ({
-  exec: vi.fn(),
+  execFile: execFileMock,
   spawn: spawnMock,
 }));
 
@@ -77,6 +78,11 @@ describe('ToolHandlers runtime launch plumbing', () => {
   beforeEach(() => {
     existsSyncMock.mockReset();
     existsSyncMock.mockReturnValue(true);
+    execFileMock.mockReset();
+    execFileMock.mockImplementation((_file: string, _args: string[], arg3?: unknown, arg4?: unknown) => {
+      const callback = typeof arg3 === 'function' ? arg3 : (typeof arg4 === 'function' ? arg4 : undefined);
+      callback?.(null, 'Godot 4.4.0', '');
+    });
     spawnMock.mockReset();
     spawnMock.mockReturnValue(createSpawnedProcess());
   });
