@@ -24,6 +24,8 @@ vi.mock('child_process', () => ({
 
 import { GodotServer } from './godot-server.js';
 import { ToolHandlers } from './tool-handlers.js';
+import { OperationExecutor } from './operation-executor.js';
+import { createOnePixelPng } from './test-helpers/png-fixture.js';
 import type { RuntimeBridgeManager } from './types.js';
 
 const projectPath = '/workspace/project';
@@ -578,6 +580,103 @@ describe('ToolHandlers runtime command delegation', () => {
     expect(runtimeManager.changeScene).toHaveBeenCalledWith('res://Other.tscn');
     expect(runtimeManager.invokeNodeAction).toHaveBeenCalledWith('root/Menu/StartButton', 'press');
   });
+
+  it('returns exact metadata text followed by native MCP image content', async () => {
+    const png = createOnePixelPng();
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
+      captureScreenshot: vi.fn().mockResolvedValue({
+        data: png.toString('base64'),
+        mimeType: 'image/png',
+        width: 1,
+        height: 1,
+        byteLength: png.length,
+        savedPath: null,
+        saveError: 'disk full',
+      }),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      new (OperationExecutor as any)('unused'),
+      runtimeManager
+    );
+
+    const result = await handlers.handleCaptureScreenshot({ save_to: 'project' });
+
+    expect(result).toEqual({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            width: 1,
+            height: 1,
+            mimeType: 'image/png',
+            byteLength: png.length,
+            savedPath: null,
+            saveError: 'disk full',
+          }, null, 2),
+        },
+        { type: 'image', data: png.toString('base64'), mimeType: 'image/png' },
+      ],
+    });
+    expect(result.content[0].text).not.toContain(png.toString('base64'));
+    expect(runtimeManager.captureScreenshot).toHaveBeenCalledWith('project');
+  });
+
+  it('maps screenshot connection failures to the standard error response without an image', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
+      captureScreenshot: vi.fn().mockRejectedValue(new Error('Runtime bridge not connected.')),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      new (OperationExecutor as any)('unused'),
+      runtimeManager
+    );
+
+    const result = await handlers.handleCaptureScreenshot({});
+
+    expect(result).toEqual({
+      content: [
+        {
+          type: 'text',
+          text: 'Failed to capture runtime screenshot: Runtime bridge not connected.',
+        },
+        {
+          type: 'text',
+          text: 'Possible solutions:\n- Start the project with runtime control enabled\n- Reconnect or update the runtime bridge if the running project restarted',
+        },
+      ],
+      isError: true,
+    });
+    expect(result.content).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'image' }),
+    ]));
+  });
+
+  it('rejects unsupported screenshot save destinations before dispatch', async () => {
+    const runtimeManager = {
+      startSession: vi.fn(),
+      stopSession: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
+      captureScreenshot: vi.fn(),
+    };
+    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
+      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
+      new (OperationExecutor as any)('unused'),
+      runtimeManager
+    );
+
+    const result = await handlers.handleCaptureScreenshot({ saveTo: 'absolute' });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('Screenshot save destination must be "temporary" or "project".');
+    expect(runtimeManager.captureScreenshot).not.toHaveBeenCalled();
+  });
 });
 
 describe('GodotServer runtime command tools', () => {
@@ -603,12 +702,22 @@ describe('GodotServer runtime command tools', () => {
           required: ['nodePath', 'action'],
         }),
       }),
+      expect.objectContaining({
+        name: 'capture_screenshot',
+        inputSchema: expect.objectContaining({
+          properties: expect.objectContaining({
+            saveTo: expect.objectContaining({ enum: ['temporary', 'project'] }),
+          }),
+          required: [],
+        }),
+      }),
     ]));
   });
 
   it('delegates runtime command tool calls to tool handlers', async () => {
     const server = new GodotServer();
     const originalToolHandlers = (server as any).toolHandlers;
+    const png = createOnePixelPng();
     const getRuntimeStateResponse = {
       content: [{ type: 'text' as const, text: '{"connected":true,"sessionId":"session-1","scenePath":"res://Main.tscn"}' }],
     };
@@ -625,6 +734,13 @@ describe('GodotServer runtime command tools', () => {
     const handleFindNode = vi.fn().mockResolvedValue(findNodeResponse);
     const handleChangeScene = vi.fn().mockResolvedValue(changeSceneResponse);
     const handleInvokeNodeAction = vi.fn().mockResolvedValue(invokeNodeActionResponse);
+    const captureScreenshotResponse = {
+      content: [
+        { type: 'text' as const, text: '{"width":1}' },
+        { type: 'image' as const, data: png.toString('base64'), mimeType: 'image/png' as const },
+      ],
+    };
+    const handleCaptureScreenshot = vi.fn().mockResolvedValue(captureScreenshotResponse);
 
     (server as any).toolHandlers = {
       cleanup: originalToolHandlers.cleanup.bind(originalToolHandlers),
@@ -632,6 +748,7 @@ describe('GodotServer runtime command tools', () => {
       handleFindNode,
       handleChangeScene,
       handleInvokeNodeAction,
+      handleCaptureScreenshot,
     };
 
     await withConnectedClient(server, async (client) => {
@@ -654,6 +771,10 @@ describe('GodotServer runtime command tools', () => {
           action: 'press',
         },
       })).resolves.toEqual(invokeNodeActionResponse);
+      await expect(client.callTool({
+        name: 'capture_screenshot',
+        arguments: { saveTo: 'temporary' },
+      })).resolves.toEqual(captureScreenshotResponse);
     });
 
     expect(handleGetRuntimeState).toHaveBeenCalledWith();
@@ -663,6 +784,7 @@ describe('GodotServer runtime command tools', () => {
       nodePath: 'root/Menu/StartButton',
       action: 'press',
     });
+    expect(handleCaptureScreenshot).toHaveBeenCalledWith({ saveTo: 'temporary' });
   });
 });
 

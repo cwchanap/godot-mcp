@@ -13,17 +13,25 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import type { GodotServerConfig, RuntimeBridgeManager, RuntimeState } from './types.js';
+import type {
+  GodotServerConfig,
+  RuntimeBridgeManager,
+  RuntimeState,
+  ScreenshotCaptureResult,
+  ScreenshotSaveDestination,
+} from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { OperationExecutor } from './operation-executor.js';
 import { ToolHandlers } from './tool-handlers.js';
 import { RuntimeControlManager } from './runtime-control-manager.js';
 
 type RuntimeToolManager = RuntimeBridgeManager & {
+  cleanup(): Promise<void>;
   getRuntimeState(): RuntimeState;
   findNode(nodePath: string): Promise<unknown>;
   changeScene(scenePath: string): Promise<unknown>;
   invokeNodeAction(nodePath: string, action: string): Promise<unknown>;
+  captureScreenshot(saveTo?: ScreenshotSaveDestination): Promise<ScreenshotCaptureResult>;
 };
 
 // Derive __filename and __dirname in ESM
@@ -283,6 +291,21 @@ export class GodotServer {
               },
             },
             required: ['nodePath', 'action'],
+          },
+        },
+        {
+          name: 'capture_screenshot',
+          description: 'Capture the next rendered frame from the active running Godot game',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              saveTo: {
+                type: 'string',
+                enum: ['temporary', 'project'],
+                description: 'Optionally persist the PNG to a managed temporary or project directory',
+              },
+            },
+            required: [],
           },
         },
         {
@@ -880,6 +903,8 @@ export class GodotServer {
           return await this.toolHandlers.handleChangeScene(request.params.arguments);
         case 'invoke_node_action':
           return await this.toolHandlers.handleInvokeNodeAction(request.params.arguments);
+        case 'capture_screenshot':
+          return await this.toolHandlers.handleCaptureScreenshot(request.params.arguments);
         case 'get_godot_version':
           return await this.toolHandlers.handleGetGodotVersion();
         case 'list_projects':

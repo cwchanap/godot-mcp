@@ -52,6 +52,7 @@ export const PARAMETER_MAPPINGS: Record<string, string> = {
   'tilemap_layer_path': 'tilemapLayerPath',
   'tileset_path': 'tilesetPath',
   'tilemap_name': 'tilemapName',
+  'save_to': 'saveTo',
 };
 
 /**

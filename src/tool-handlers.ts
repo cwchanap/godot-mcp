@@ -6,7 +6,13 @@ import { join, basename } from 'path';
 import { existsSync } from 'fs';
 import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
-import type { GodotProcess, RuntimeBridgeManager, RuntimeState } from './types.js';
+import type {
+  GodotProcess,
+  RuntimeBridgeManager,
+  RuntimeState,
+  ScreenshotCaptureResult,
+  ScreenshotSaveDestination,
+} from './types.js';
 import { GodotPathManager } from './godot-path.js';
 import { ProjectUtils } from './project-utils.js';
 import { OperationExecutor } from './operation-executor.js';
@@ -21,10 +27,12 @@ interface OperationToolOptions {
 }
 
 type RuntimeToolManager = RuntimeBridgeManager & {
+  cleanup(): Promise<void>;
   getRuntimeState(): RuntimeState;
   findNode(nodePath: string): Promise<unknown>;
   changeScene(scenePath: string): Promise<unknown>;
   invokeNodeAction(nodePath: string, action: string): Promise<unknown>;
+  captureScreenshot(saveTo?: ScreenshotSaveDestination): Promise<ScreenshotCaptureResult>;
 };
 
 export class ToolHandlers {
@@ -707,6 +715,42 @@ export class ToolHandlers {
         [
           'Start the project with runtime control enabled',
           'Use an allowlisted node action supported by the runtime bridge',
+        ]
+      );
+    }
+  }
+
+  async handleCaptureScreenshot(args: any) {
+    args = this.operationExecutor.normalizeParameters(args ?? {});
+    if (args.saveTo !== undefined && args.saveTo !== 'temporary' && args.saveTo !== 'project') {
+      return this.createErrorResponse(
+        'Screenshot save destination must be "temporary" or "project".',
+        ['Omit saveTo to return the image without writing a file']
+      );
+    }
+
+    try {
+      const result = await this.runtimeControlManager.captureScreenshot(args.saveTo);
+      const metadata = {
+        width: result.width,
+        height: result.height,
+        mimeType: result.mimeType,
+        byteLength: result.byteLength,
+        savedPath: result.savedPath,
+        saveError: result.saveError,
+      };
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify(metadata, null, 2) },
+          { type: 'image', data: result.data, mimeType: result.mimeType },
+        ],
+      };
+    } catch (error: any) {
+      return this.createErrorResponse(
+        `Failed to capture runtime screenshot: ${error?.message || 'Unknown error'}`,
+        [
+          'Start the project with runtime control enabled',
+          'Reconnect or update the runtime bridge if the running project restarted',
         ]
       );
     }
