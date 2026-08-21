@@ -80,12 +80,26 @@ Every successful call returns two MCP content items:
    - `mimeType`, always `image/png`
    - `byteLength`
    - `savedPath`, an absolute path when persisted and `null` otherwise
+   - `saveError`, a concise filesystem error when requested persistence fails and `null` otherwise
 2. An image item containing:
    - `type: "image"`
-   - the validated base64 PNG data
+   - `data`, containing the validated base64 PNG
    - `mimeType: "image/png"`
 
 The image is always returned, including when persistence is requested. Persistence supplements the MCP response rather than replacing it.
+
+The exact success shape is:
+
+```typescript
+{
+  content: [
+    { type: "text", text: JSON.stringify(metadata, null, 2) },
+    { type: "image", data: pngBase64, mimeType: "image/png" }
+  ]
+}
+```
+
+Screenshot failures that produce no valid image use the existing `createErrorResponse` helper and its runtime reconnect guidance. A bridge response with `ok: false` is not returned as ordinary JSON text.
 
 ## Runtime Command Contract
 
@@ -126,41 +140,52 @@ On failure, it returns the existing structured error shape:
 
 ## Capture Flow
 
-1. The MCP handler validates `saveTo`.
+1. The MCP handler normalizes `save_to` to `saveTo` and validates the closed enum.
 2. `RuntimeControlManager` verifies that a compatible runtime bridge is connected.
 3. The manager rejects the request if another capture is already in flight.
 4. The manager sends `capture_screenshot` through the active authenticated socket.
-5. The bridge starts an asynchronous capture operation and awaits `RenderingServer.frame_post_draw`.
-6. The bridge reads `get_viewport().get_texture().get_image()` from its root viewport.
-7. The bridge rejects an unavailable, empty, or headless render result.
-8. The bridge normalizes the image to `RGBA8`; when the root viewport uses HDR 2D, it also converts the linear image to sRGB so the PNG matches the displayed colors.
-9. The bridge encodes the image with `save_png_to_buffer()` and enforces the decoded PNG size limit.
-10. The bridge base64-encodes the PNG and returns it with dimensions and byte length.
-11. TypeScript validates the response before treating it as image data.
-12. When requested, TypeScript persists the validated bytes to the selected safe root.
-13. The handler returns metadata and MCP image content.
+5. The bridge routes the command through the same async-capable dispatcher used by every command and rejects it if a bridge-side capture is already in flight.
+6. The bridge awaits `RenderingServer.frame_post_draw`.
+7. The bridge reads `get_viewport().get_texture().get_image()` from its root viewport.
+8. The bridge rejects an unavailable, empty, or headless render result.
+9. The bridge normalizes the image to `RGBA8`; when the root viewport uses HDR 2D, it also converts the linear image to sRGB so the PNG matches the displayed colors.
+10. The bridge encodes the image with `save_png_to_buffer()` and enforces the decoded PNG size limit.
+11. The bridge base64-encodes the PNG and returns it with dimensions and byte length.
+12. TypeScript validates the response before treating it as image data.
+13. When requested, TypeScript attempts to persist the validated bytes to the selected safe root.
+14. The handler returns metadata and MCP image content, including a persistence error in metadata when the image is valid but the write failed.
 
-Other runtime commands remain synchronous and unchanged. Screenshot capture has a dedicated asynchronous response path so `_handle_raw_message` does not attempt to use a coroutine result as a synchronous dictionary.
+`_handle_raw_message` awaits `_handle_command(message)` and sends the resulting dictionary through the existing response path. Existing synchronous handlers return immediately under GDScript's `await` semantics, while screenshot capture can yield until the frame is ready. Screenshot capture does not introduce a second response-sending path.
 
 ## Concurrency and Timeouts
 
-Only one screenshot may be in flight for an active runtime session. A concurrent request fails immediately with a retryable `Screenshot capture already in progress` error. The design does not queue captures because queued requests could represent stale frames and multiply expensive GPU readbacks.
+Only one screenshot may be in flight for an active runtime session. Both the TypeScript manager and GDScript bridge enforce this invariant. The bridge-side guard is authoritative for GPU readback and encoding; the manager-side guard fails redundant MCP calls before sending them. A concurrent request fails immediately with a retryable `Screenshot capture already in progress` error. The design does not queue captures because queued requests could represent stale frames and multiply expensive GPU readbacks.
 
-Capture uses the existing runtime command timeout. A timeout or socket loss follows the existing reconnect-required behavior. The in-flight guard must be cleared in a `finally` path so failed captures do not permanently block later calls.
+Capture uses the existing 10-second reply deadline but not `sendCommand`'s catch-all reconnect policy. A screenshot timeout can mean that a frame was not drawn or PNG encoding was slow; it does not prove that the socket disconnected. The timeout returns a capture-specific error and clears the TypeScript in-flight guard without changing runtime connection state. Socket close remains authoritative for marking the session disconnected. Existing non-screenshot runtime command behavior remains unchanged.
+
+Both the TypeScript and bridge-side in-flight guards must be cleared in guaranteed cleanup paths so failed or timed-out captures do not permanently block later calls. A late bridge response after a TypeScript timeout is ignored through the existing missing-request-ID behavior.
+
+## Large Response Writes
+
+The bridge keeps one NDJSON message per response. `StreamPeer.put_data()` is used for the serialized byte buffer because Godot defines it to block until the full buffer has been sent. `_send_message` must inspect its returned `Error` and report or disconnect on failure rather than silently assuming success.
+
+V1 does not add a partial-write loop, chunks, or a second framing protocol. A socket-level test must round-trip a valid PNG close to the 16 MiB decoded limit and verify that the complete JSON response is received and correlated to its request ID.
 
 ## Payload Limits and Validation
 
 The decoded PNG limit is **16 MiB**. The maximum newline-delimited bridge message is **24 MiB**, which accommodates base64 expansion plus the JSON envelope while preventing an unbounded receive buffer.
 
-The bridge checks the PNG byte length before base64 encoding and returns a small structured error when it exceeds 16 MiB. The TypeScript server independently checks:
+The bridge checks the PNG byte length before base64 encoding and returns a small structured error when it exceeds 16 MiB. TypeScript validates the decoded response through a pure `validateScreenshotPayload()` function next to the runtime manager so payload rules can be tested without a socket. It checks:
 
 - the encoded response length before decoding
-- strict base64 syntax and canonical decoding
+- that `pngBase64` is a non-empty string and decodes to non-empty bytes
 - decoded size at or below 16 MiB
 - the standard PNG file signature
 - `mimeType` equals `image/png`
 - positive integer width and height
 - declared `byteLength` equals the decoded buffer length
+
+The validator uses Node's base64 decoder and the image invariants above. It does not add a separate canonical-base64 policy to the trusted localhost bridge protocol.
 
 If either the socket receive buffer or one complete raw message exceeds 24 MiB, the server closes the connection and applies the existing reconnect-required state. This bounds malformed or hostile bridge responses even outside the screenshot happy path.
 
@@ -180,6 +205,7 @@ Persistence happens only after the PNG passes validation.
 - Files are written beneath `<active-project>/.godot-mcp/captures/`.
 - The active project path comes from the authenticated runtime session, not tool input.
 - Existing symlinks that would move the managed capture directory outside the canonical project root are rejected.
+- The server writes `<active-project>/.godot-mcp/.gdignore` so Godot does not import managed capture artifacts.
 - Project captures persist until the user or agent removes them.
 
 ### Write behavior
@@ -188,7 +214,9 @@ Persistence happens only after the PNG passes validation.
 - Writes use unique generated names and exclusive creation; existing files are never overwritten.
 - Required managed directories are created by the server.
 - The absolute saved path is returned only after the write succeeds.
-- If persistence was requested and fails, the entire tool call reports an error. It must not claim partial persistence success.
+- If persistence was requested and fails after a valid capture, the tool still returns the image with `savedPath: null` and a concise `saveError`. It does not set `isError` because the primary capture succeeded, and it never claims that a file exists.
+
+Temporary-directory cleanup is owned by `RuntimeControlManager` and is invoked through the existing `ToolHandlers.cleanup()` and `GodotServer.shutdown()` chain.
 
 ## Error Handling
 
@@ -213,15 +241,18 @@ Expected errors include:
   - report the measured size and fixed v1 limit
 
 - **invalid bridge image payload**
-  - reject invalid base64, PNG signature, metadata, or size without writing a file
+  - reject undecodable or empty base64, PNG signature, metadata, or size without writing a file
 
 - **persistence failure**
-  - report the selected destination and filesystem failure without exposing unrelated filesystem data
+  - return the valid image with `savedPath: null` and a concise `saveError` without exposing unrelated filesystem data
 
-- **capture timeout or socket loss**
-  - use the existing reconnect-required behavior
+- **capture timeout**
+  - report a capture-specific timeout without marking the bridge disconnected
 
-All failures use the existing MCP error-response convention. No failure silently returns an empty or stale image.
+- **socket loss**
+  - use the existing reconnect-required behavior after the socket close marks the session disconnected
+
+All capture failures that produce no valid image use the existing MCP error-response convention. A persistence warning is the only partial-success case, and it never silently returns an empty or stale image.
 
 ## Compatibility and Versioning
 
@@ -238,18 +269,21 @@ Add coverage for:
 - sending the `capture_screenshot` command
 - decoding and returning a valid PNG response
 - disconnected and reconnect-required behavior
+- a capture timeout that preserves connected state and allows a later capture
 - the single in-flight capture guard and guard cleanup after failure
-- invalid base64 and noncanonical base64
+- invalid or empty base64
 - invalid PNG signature
 - invalid MIME type, dimensions, and byte length
 - decoded PNGs over 16 MiB
 - socket buffers over 24 MiB
+- a complete socket round-trip for a valid PNG near the 16 MiB limit
 - return-only behavior with no filesystem write
 - MCP-managed temporary persistence and cleanup
 - project persistence beneath the authenticated project root
+- creation of `.godot-mcp/.gdignore`
 - refusal of symlink escape paths
 - exclusive non-overwriting filenames
-- persistence failures
+- persistence failures that preserve the valid image
 
 ### Tool and server tests
 
@@ -257,10 +291,11 @@ Add coverage for:
 
 - tool registration and schema
 - dispatch to the screenshot handler
-- `saveTo` normalization and rejection of unsupported values
+- `save_to` normalization to `saveTo` and rejection of unsupported values
 - metadata text content
-- MCP image content with `image/png`
-- structured error mapping
+- exact `content[1]` shape `{ type: "image", data, mimeType: "image/png" }`
+- bridge and validation failures mapped through `createErrorResponse`
+- persistence warnings returned with the valid image and without `isError`
 
 ### Runtime bridge and integration tests
 
@@ -269,7 +304,7 @@ Extend the Godot integration fixture with a scene that renders known colors. Lau
 - PNG signature
 - expected viewport dimensions
 - representative pixels from the known scene
-- expected sRGB output for an HDR 2D fixture when the test renderer supports it
+- expected sRGB pixels from an HDR 2D fixture
 - temporary persistence
 - project persistence
 
@@ -295,6 +330,8 @@ Update the README to:
 - document the `saveTo` modes and managed locations
 - show a minimal return-only example and one persistence example
 - state the 16 MiB PNG limit and headless-mode exclusion
+- add `capture_screenshot` to the README `autoApprove` example
+- replace CONTRIBUTING's stale caller-controlled screenshot-path description with the approved `saveTo` contract
 
 The current `npx @coding-solo/godot-mcp` installation instructions remain unchanged.
 
@@ -308,5 +345,7 @@ The feature is complete when:
 - no caller-controlled path can escape the approved storage roots
 - oversized or malformed image responses are rejected before persistence
 - concurrent capture attempts are bounded and recover after success or failure
+- capture timeouts do not falsely disconnect a live bridge
+- persistence failures preserve and return a valid captured image with accurate warning metadata
 - existing runtime tools remain compatible
 - automated verification and manual visual inspection pass
