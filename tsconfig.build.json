@@ -9,5 +9,5 @@
     "outDir": "./build",
     "rootDir": "./src"
   },
-  "exclude": ["src/**/*.spec.ts"]
+  "exclude": ["src/**/*.spec.ts", "src/test-helpers/**"]
 }
