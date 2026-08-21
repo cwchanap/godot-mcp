@@ -678,15 +678,16 @@ export class RuntimeControlManager {
     let newlineIndex = session.receiveBuffer.indexOf('\n');
 
     while (newlineIndex !== -1) {
-      const rawMessage = session.receiveBuffer.slice(0, newlineIndex).trim();
+      const rawMessage = session.receiveBuffer.slice(0, newlineIndex);
       session.receiveBuffer = session.receiveBuffer.slice(newlineIndex + 1);
 
       if (Buffer.byteLength(rawMessage, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES) {
         socket.destroy();
         return;
       }
-      if (rawMessage.length > 0) {
-        this.parseAndHandleBridgeMessage(session, socket, rawMessage);
+      const trimmedMessage = rawMessage.trim();
+      if (trimmedMessage.length > 0) {
+        this.parseAndHandleBridgeMessage(session, socket, trimmedMessage);
       }
 
       newlineIndex = session.receiveBuffer.indexOf('\n');

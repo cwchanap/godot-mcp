@@ -574,6 +574,17 @@ describe('RuntimeControlManager', () => {
     await manager.stopSession();
   });
 
+  it('disconnects a bridge whose newline-terminated line exceeds 24 MiB before trimming', async () => {
+    const { manager, socket } = await connectRealManager(projectPath);
+    socket.write(Buffer.concat([
+      Buffer.alloc(MAX_RUNTIME_MESSAGE_BYTES, 0x20),
+      Buffer.from('{}\n'),
+    ]));
+    await once(socket, 'close');
+    expect(manager.getRuntimeState().connected).toBe(false);
+    await manager.stopSession();
+  });
+
   it('returns a disconnected error when change_scene is called without a connected bridge', async () => {
     await expect(manager.changeScene('res://Main.tscn')).rejects.toThrow(/not connected/i);
     expect(sendCommandMock).not.toHaveBeenCalled();
