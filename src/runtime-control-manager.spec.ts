@@ -4,6 +4,8 @@ import { Socket, createConnection } from 'node:net';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuntimeControlManager } from './runtime-control-manager.js';
+import { MAX_RUNTIME_MESSAGE_BYTES, MAX_SCREENSHOT_PNG_BYTES } from './screenshot-payload.js';
+import { createNearLimitPng, createOnePixelPng } from './test-helpers/png-fixture.js';
 
 const projectPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control-project');
 const generatedAssetsPath = path.join(process.cwd(), '.test-artifacts', 'runtime-control-assets');
@@ -149,6 +151,25 @@ describe('RuntimeControlManager', () => {
     await rm(projectPath, { recursive: true, force: true });
     await rm(generatedAssetsPath, { recursive: true, force: true });
   });
+
+  async function connectRealManager(projectPath: string): Promise<{
+    manager: RuntimeControlManager;
+    socket: Socket;
+  }> {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
+    const session = await manager.startSession(projectPath);
+    const socket = await connectBridgeClient(session.port);
+    await writeJsonLine(socket, {
+      command: 'hello',
+      token: session.token,
+      version: bridgeVersion,
+      sessionId: session.sessionId,
+      projectPath,
+      scenePath: 'res://Main.tscn',
+    });
+    await expect(readJsonLine(socket)).resolves.toMatchObject({ ok: true });
+    return { manager, socket };
+  }
 
   it('reports no active runtime session before launch', () => {
     const manager = new RuntimeControlManager();
@@ -464,6 +485,93 @@ describe('RuntimeControlManager', () => {
       await closeBridgeClient(socket);
       await realManager.stopSession();
     }
+  });
+
+  it('round-trips a screenshot near the 16 MiB limit over the real socket', async () => {
+    const png = createNearLimitPng(MAX_SCREENSHOT_PNG_BYTES - 1024);
+    const { manager, socket } = await connectRealManager(projectPath);
+    const capture = manager.captureScreenshot();
+    const request = await readJsonLine(socket);
+    expect(request).toMatchObject({ command: 'capture_screenshot', requestId: expect.any(String) });
+    await writeJsonLine(socket, {
+      requestId: request.requestId,
+      ok: true,
+      result: {
+        pngBase64: png.toString('base64'),
+        mimeType: 'image/png',
+        width: 1,
+        height: 1,
+        byteLength: png.length,
+      },
+    });
+    await expect(capture).resolves.toMatchObject({
+      data: png.toString('base64'),
+      byteLength: png.length,
+      savedPath: null,
+      saveError: null,
+    });
+    await closeBridgeClient(socket);
+    await manager.stopSession();
+  });
+
+  it('keeps the bridge connected after a screenshot timeout and permits retry', async () => {
+    vi.useFakeTimers();
+    const { manager, socket } = await connectRealManager(projectPath);
+    const firstCapture = manager.captureScreenshot();
+    const firstCaptureExpectation = expect(firstCapture).rejects.toThrow(/screenshot capture timed out/i);
+    await readJsonLine(socket);
+    await vi.advanceTimersByTimeAsync(10000);
+    await firstCaptureExpectation;
+    expect(manager.getRuntimeState().connected).toBe(true);
+
+    const png = createOnePixelPng();
+    const retry = manager.captureScreenshot();
+    const retryRequest = await readJsonLine(socket);
+    await writeJsonLine(socket, {
+      requestId: retryRequest.requestId,
+      ok: true,
+      result: {
+        pngBase64: png.toString('base64'),
+        mimeType: 'image/png',
+        width: 1,
+        height: 1,
+        byteLength: png.length,
+      },
+    });
+    await expect(retry).resolves.toMatchObject({ byteLength: png.length });
+    vi.useRealTimers();
+    await closeBridgeClient(socket);
+    await manager.stopSession();
+  });
+
+  it('rejects a second capture while the first is in flight and then recovers', async () => {
+    const png = createOnePixelPng();
+    const { manager, socket } = await connectRealManager(projectPath);
+    const first = manager.captureScreenshot();
+    const firstRequest = await readJsonLine(socket);
+    await expect(manager.captureScreenshot()).rejects.toThrow(/already in progress/i);
+    await writeJsonLine(socket, {
+      requestId: firstRequest.requestId,
+      ok: true,
+      result: {
+        pngBase64: png.toString('base64'),
+        mimeType: 'image/png',
+        width: 1,
+        height: 1,
+        byteLength: png.length,
+      },
+    });
+    await expect(first).resolves.toMatchObject({ byteLength: png.length });
+    await closeBridgeClient(socket);
+    await manager.stopSession();
+  });
+
+  it('disconnects a bridge whose unterminated receive buffer exceeds 24 MiB', async () => {
+    const { manager, socket } = await connectRealManager(projectPath);
+    socket.write(Buffer.alloc(MAX_RUNTIME_MESSAGE_BYTES + 1, 0x61));
+    await once(socket, 'close');
+    expect(manager.getRuntimeState().connected).toBe(false);
+    await manager.stopSession();
   });
 
   it('returns a disconnected error when change_scene is called without a connected bridge', async () => {

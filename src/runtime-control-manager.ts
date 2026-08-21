@@ -4,7 +4,17 @@ import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promis
 import { createServer, type Server, type Socket } from 'node:net';
 import { dirname, join, normalize, parse, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import type { RuntimeBridgeStatus, RuntimeLaunchSession, RuntimeState } from './types.js';
+import {
+  MAX_RUNTIME_MESSAGE_BYTES,
+  validateScreenshotPayload,
+} from './screenshot-payload.js';
+import type {
+  RuntimeBridgeStatus,
+  RuntimeLaunchSession,
+  RuntimeState,
+  ScreenshotCaptureResult,
+  ScreenshotSaveDestination,
+} from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,6 +69,9 @@ type RuntimeCommand =
     command: 'invoke_node_action';
     nodePath: string;
     action: string;
+  }
+  | {
+    command: 'capture_screenshot';
   };
 
 type RuntimeFindNodeResponse = {
@@ -108,6 +121,7 @@ export class RuntimeControlManager {
   private activeSessionId: string | null = null;
   private runtimeState: RuntimeState = { connected: false, sessionId: null, scenePath: null };
   private connectionStatus: RuntimeConnectionStatus = 'idle';
+  private screenshotCaptureInFlight = false;
 
   constructor(options: RuntimeControlManagerOptions = {}) {
     this.runtimeBridgeAssetsDir = options.runtimeBridgeAssetsDir ?? join(__dirname, '..', 'build', 'scripts');
@@ -240,6 +254,46 @@ export class RuntimeControlManager {
     }
 
     return this.sendCommand({ command: 'invoke_node_action', nodePath, action });
+  }
+
+  async captureScreenshot(saveTo?: ScreenshotSaveDestination): Promise<ScreenshotCaptureResult> {
+    this.assertRuntimeConnected();
+    if (this.screenshotCaptureInFlight) {
+      throw new Error('Screenshot capture already in progress.');
+    }
+    if (saveTo !== undefined) {
+      throw new Error('Screenshot persistence is not available yet.');
+    }
+
+    this.screenshotCaptureInFlight = true;
+    try {
+      const response = await this.commandSender({ command: 'capture_screenshot' }) as {
+        ok?: boolean;
+        error?: string;
+        result?: unknown;
+      };
+      if (response.ok !== true) {
+        throw new Error(response.error ?? 'Screenshot capture failed.');
+      }
+      const screenshot = validateScreenshotPayload(response.result);
+      return {
+        data: screenshot.data,
+        mimeType: screenshot.mimeType,
+        width: screenshot.width,
+        height: screenshot.height,
+        byteLength: screenshot.byteLength,
+        savedPath: null,
+        saveError: null,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Screenshot capture failed.';
+      if (/timed out/i.test(message)) {
+        throw new Error(`Screenshot capture timed out after ${COMMAND_REPLY_TIMEOUT_MS}ms.`);
+      }
+      throw error;
+    } finally {
+      this.screenshotCaptureInFlight = false;
+    }
   }
 
   async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -471,7 +525,7 @@ export class RuntimeControlManager {
     return this.bridgeVersion;
   }
 
-  private async sendCommand(command: RuntimeCommand): Promise<unknown> {
+  private assertRuntimeConnected(): void {
     if (!this.runtimeState.sessionId) {
       throw new Error('Runtime bridge not connected.');
     }
@@ -483,6 +537,10 @@ export class RuntimeControlManager {
 
       throw new Error('Runtime bridge not connected.');
     }
+  }
+
+  private async sendCommand(command: RuntimeCommand): Promise<unknown> {
+    this.assertRuntimeConnected();
 
     try {
       return await this.commandSender(command);
@@ -609,28 +667,52 @@ export class RuntimeControlManager {
     }
 
     session.receiveBuffer += chunk.toString();
+    if (
+      !session.receiveBuffer.includes('\n') &&
+      Buffer.byteLength(session.receiveBuffer, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES
+    ) {
+      socket.destroy();
+      return;
+    }
+
     let newlineIndex = session.receiveBuffer.indexOf('\n');
 
     while (newlineIndex !== -1) {
       const rawMessage = session.receiveBuffer.slice(0, newlineIndex).trim();
       session.receiveBuffer = session.receiveBuffer.slice(newlineIndex + 1);
 
+      if (Buffer.byteLength(rawMessage, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES) {
+        socket.destroy();
+        return;
+      }
       if (rawMessage.length > 0) {
-        let message: RuntimeBridgeMessage;
-
-        try {
-          message = JSON.parse(rawMessage) as RuntimeBridgeMessage;
-        } catch {
-          this.runSocketTask(this.sendSocketMessage(socket, { ok: false, error: 'Invalid message' }));
-          newlineIndex = session.receiveBuffer.indexOf('\n');
-          continue;
-        }
-
-        this.runSocketTask(this.handleBridgeMessage(session, socket, message));
+        this.parseAndHandleBridgeMessage(session, socket, rawMessage);
       }
 
       newlineIndex = session.receiveBuffer.indexOf('\n');
     }
+
+    if (
+      !session.receiveBuffer.includes('\n') &&
+      Buffer.byteLength(session.receiveBuffer, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES
+    ) {
+      socket.destroy();
+    }
+  }
+
+  private parseAndHandleBridgeMessage(
+    session: ActiveRuntimeSession,
+    socket: Socket,
+    rawMessage: string
+  ): void {
+    let message: RuntimeBridgeMessage;
+    try {
+      message = JSON.parse(rawMessage) as RuntimeBridgeMessage;
+    } catch {
+      this.runSocketTask(this.sendSocketMessage(socket, { ok: false, error: 'Invalid message' }));
+      return;
+    }
+    this.runSocketTask(this.handleBridgeMessage(session, socket, message));
   }
 
   private async handleBridgeMessage(

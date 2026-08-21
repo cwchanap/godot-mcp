@@ -96,6 +96,18 @@ export interface RuntimeLaunchSession {
   sessionId: string;
 }
 
+export type ScreenshotSaveDestination = 'temporary' | 'project';
+
+export interface ScreenshotCaptureResult {
+  data: string;
+  mimeType: 'image/png';
+  width: number;
+  height: number;
+  byteLength: number;
+  savedPath: string | null;
+  saveError: string | null;
+}
+
 export interface RuntimeControlSessionManager {
   startSession(projectPath: string): Promise<RuntimeLaunchSession>;
   stopSession(): Promise<void>;
