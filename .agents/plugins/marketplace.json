@@ -11,7 +11,7 @@
         "path": "./plugins/godot-plugin"
       },
       "policy": {
-        "installation": "AVAILABLE",
+        "installation": "NOT_AVAILABLE",
         "authentication": "ON_INSTALL"
       },
       "category": "Developer Tools"
