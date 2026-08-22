@@ -116,7 +116,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
+      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -140,7 +140,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
+      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -163,74 +163,6 @@ describe('ToolHandlers runtime launch plumbing', () => {
       ]),
       expect.anything()
     );
-  });
-
-  it('returns an error when runtimeControl is true but bridge is not installed', async () => {
-    const runtimeManager = {
-      startSession: vi.fn(),
-      stopSession: vi.fn().mockResolvedValue(undefined),
-      cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: false, version: null, compatible: false }),
-    };
-    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
-      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
-      { normalizeParameters: (args: unknown) => args },
-      runtimeManager
-    );
-
-    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('not installed');
-    expect(runtimeManager.startSession).not.toHaveBeenCalled();
-  });
-
-  it('returns an error when runtimeControl is true but bridge is incompatible', async () => {
-    const runtimeManager = {
-      startSession: vi.fn(),
-      stopSession: vi.fn().mockResolvedValue(undefined),
-      cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '0.0.1-stale', compatible: false }),
-    };
-    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
-      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
-      { normalizeParameters: (args: unknown) => args },
-      runtimeManager
-    );
-
-    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('not compatible');
-    expect(runtimeManager.startSession).not.toHaveBeenCalled();
-  });
-
-  it('does not kill the existing process when bridge preflight fails', async () => {
-    const runtimeManager = {
-      startSession: vi.fn(),
-      stopSession: vi.fn().mockResolvedValue(undefined),
-      cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: false, version: null, compatible: false }),
-    };
-    const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
-      { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
-      { normalizeParameters: (args: unknown) => args },
-      runtimeManager
-    );
-
-    // First launch: create an initial active process (no runtime control)
-    await handlers.handleRunProject({ projectPath });
-    expect(spawnMock).toHaveBeenCalledTimes(1);
-    const firstProcess = spawnMock.mock.results[0].value;
-
-    // Second launch with runtimeControl but bridge not installed:
-    // should return error without killing the first process
-    const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('not installed');
-    expect(firstProcess.kill).not.toHaveBeenCalled();
-    expect(runtimeManager.stopSession).not.toHaveBeenCalled();
-    // The original process should still be tracked
-    expect((handlers as any).activeProcess).not.toBeNull();
-    expect((handlers as any).activeProcess.process).toBe(firstProcess);
   });
 
   it('clears activeProcess before async stopSession so old exit handler cannot tear down new session', async () => {
@@ -336,7 +268,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
+      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -396,7 +328,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockRejectedValue(new Error('stopSession boom')),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true }),
+      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -417,7 +349,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       startSession: vi.fn(),
       stopSession: vi.fn().mockResolvedValue(undefined),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      getBridgeStatus: vi.fn().mockRejectedValue(new Error('EACCES: permission denied')),
+      ensureBridge: vi.fn().mockRejectedValue(new Error('EACCES: permission denied')),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -439,61 +371,55 @@ describe('ToolHandlers runtime launch plumbing', () => {
 });
 
 describe('GodotServer runtime bridge management tools', () => {
-  it('registers runtime bridge management tools', async () => {
+  it('registers consolidated runtime bridge management tools', async () => {
     const server = new GodotServer();
 
     const tools = await listTools(server);
+    const names = tools.map((tool) => tool.name);
 
-    expect(tools).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: 'install_runtime_bridge' }),
-      expect.objectContaining({ name: 'get_runtime_bridge_status' }),
-      expect.objectContaining({ name: 'update_runtime_bridge' }),
-      expect.objectContaining({ name: 'uninstall_runtime_bridge' }),
+    expect(names).toEqual(expect.arrayContaining([
+      'ensure_runtime_bridge',
+      'get_runtime_bridge_status',
+      'uninstall_runtime_bridge',
     ]));
+    expect(names).not.toContain('install_runtime_bridge');
+    expect(names).not.toContain('update_runtime_bridge');
   });
 
-  it('delegates runtime bridge management tool calls to tool handlers', async () => {
+  it('delegates consolidated runtime bridge management tool calls to tool handlers', async () => {
     const server = new GodotServer();
     const originalToolHandlers = (server as any).toolHandlers;
-    const installResponse = { content: [{ type: 'text' as const, text: '{"installed":true}' }] };
+    const ensureResponse = { content: [{ type: 'text' as const, text: '{"installed":true,"compatible":true,"action":"unchanged"}' }] };
     const statusResponse = { content: [{ type: 'text' as const, text: '{"installed":true,"compatible":true}' }] };
-    const updateResponse = { content: [{ type: 'text' as const, text: '{"installed":true,"version":"1.0.0"}' }] };
     const uninstallResponse = { content: [{ type: 'text' as const, text: '{"message":"removed"}' }] };
-    const handleInstallRuntimeBridge = vi.fn().mockResolvedValue(installResponse);
+    const handleEnsureRuntimeBridge = vi.fn().mockResolvedValue(ensureResponse);
     const handleGetRuntimeBridgeStatus = vi.fn().mockResolvedValue(statusResponse);
-    const handleUpdateRuntimeBridge = vi.fn().mockResolvedValue(updateResponse);
     const handleUninstallRuntimeBridge = vi.fn().mockResolvedValue(uninstallResponse);
 
     (server as any).toolHandlers = {
       cleanup: originalToolHandlers.cleanup.bind(originalToolHandlers),
-      handleInstallRuntimeBridge,
+      handleEnsureRuntimeBridge,
       handleGetRuntimeBridgeStatus,
-      handleUpdateRuntimeBridge,
       handleUninstallRuntimeBridge,
     };
 
     await withConnectedClient(server, async (client) => {
       await expect(client.callTool({
-        name: 'install_runtime_bridge',
+        name: 'ensure_runtime_bridge',
         arguments: { projectPath },
-      })).resolves.toEqual(installResponse);
+      })).resolves.toEqual(ensureResponse);
       await expect(client.callTool({
         name: 'get_runtime_bridge_status',
         arguments: { projectPath },
       })).resolves.toEqual(statusResponse);
-      await expect(client.callTool({
-        name: 'update_runtime_bridge',
-        arguments: { projectPath },
-      })).resolves.toEqual(updateResponse);
       await expect(client.callTool({
         name: 'uninstall_runtime_bridge',
         arguments: { projectPath },
       })).resolves.toEqual(uninstallResponse);
     });
 
-    expect(handleInstallRuntimeBridge).toHaveBeenCalledWith({ projectPath });
+    expect(handleEnsureRuntimeBridge).toHaveBeenCalledWith({ projectPath });
     expect(handleGetRuntimeBridgeStatus).toHaveBeenCalledWith({ projectPath });
-    expect(handleUpdateRuntimeBridge).toHaveBeenCalledWith({ projectPath });
     expect(handleUninstallRuntimeBridge).toHaveBeenCalledWith({ projectPath });
   });
 });

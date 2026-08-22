@@ -846,7 +846,7 @@ describe('RuntimeControlManager', () => {
 
   it('installs the bridge addon into addons/godot_mcp_runtime', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    const status = await manager.installBridge(projectPath);
+    const status = await manager.ensureBridge(projectPath);
 
     expect(status.installed).toBe(true);
     expect(status.version).toBe(bridgeVersion);
@@ -857,7 +857,7 @@ describe('RuntimeControlManager', () => {
   it('registers the GodotMcpRuntimeBridge autoload entry during install', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
 
-    await manager.installBridge(projectPath);
+    await manager.ensureBridge(projectPath);
 
     const projectContents = await readFile(projectFile, 'utf8');
     expect(projectContents).toContain(runtimeBridgeAutoloadKey);
@@ -870,7 +870,7 @@ describe('RuntimeControlManager', () => {
       `[application]\nconfig/name="Runtime Control Test"\n\n[autoload]\nGodotMcpRuntimeBridge="*res://legacy/runtime_bridge.gd"\nOtherBridge="*res://addons/other/runtime_bridge.gd"\n`
     );
 
-    await manager.installBridge(projectPath);
+    await manager.ensureBridge(projectPath);
 
     const projectContents = await readFile(projectFile, 'utf8');
     const bridgeEntries = projectContents
@@ -1078,7 +1078,7 @@ describe('RuntimeControlManager', () => {
     );
 
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    const status = await manager.updateBridge(projectPath);
+    const status = await manager.ensureBridge(projectPath);
 
     expect(status).toEqual(expect.objectContaining({
       installed: true,
@@ -1091,7 +1091,7 @@ describe('RuntimeControlManager', () => {
 
   it('refuses uninstall while the bridge session is active', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    await manager.installBridge(projectPath);
+    await manager.ensureBridge(projectPath);
     manager.setActiveSessionForTest('session-1');
 
     await expect(manager.uninstallBridge(projectPath)).rejects.toThrow(/running session/i);
@@ -1115,7 +1115,7 @@ describe('RuntimeControlManager', () => {
         await writeFile(otherProjectFile, '[application]\nconfig/name="Other Project"\n');
 
         const uninstallManager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-        await uninstallManager.installBridge(otherProjectPath);
+        await uninstallManager.ensureBridge(otherProjectPath);
 
         // Should succeed because the active session is for a different project
         await uninstallManager.uninstallBridge(otherProjectPath);
@@ -1132,7 +1132,7 @@ describe('RuntimeControlManager', () => {
 
   it('removes the owned autoload entry during uninstall', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    await manager.installBridge(projectPath);
+    await manager.ensureBridge(projectPath);
 
     await manager.uninstallBridge(projectPath);
 
@@ -1141,7 +1141,7 @@ describe('RuntimeControlManager', () => {
 
   it('keeps bridge files intact when autoload cleanup fails during uninstall', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    await manager.installBridge(projectPath);
+    await manager.ensureBridge(projectPath);
     await chmod(projectFile, 0o444);
 
     await expect(manager.uninstallBridge(projectPath)).rejects.toThrow();
@@ -1181,7 +1181,7 @@ plugin_list={"MyPlugin":true}
     await writeFile(projectFile, initialProjectGodot);
 
     // Install bridge
-    await manager.installBridge(projectPath);
+    await manager.ensureBridge(projectPath);
     let projectContents = await readFile(projectFile, 'utf8');
     // [editor_plugins] section and its contents must be preserved
     expect(projectContents).toContain('[editor_plugins]');

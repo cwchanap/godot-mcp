@@ -290,12 +290,6 @@ async function runPausedTreeFixture(): Promise<PausedTreeFixtureResult> {
     await prepareFixtureProject();
 
     return await withConnectedClient(async (client, server) => {
-      const bridgeStatus = await callJsonTool<{ installed: boolean }>(
-        client,
-        'install_runtime_bridge',
-        { projectPath: scratchFixturePath }
-      );
-
       const runResult = await callTool(client, 'run_project', {
         projectPath: scratchFixturePath,
         runtimeControl: true,
@@ -304,6 +298,12 @@ async function runPausedTreeFixture(): Promise<PausedTreeFixtureResult> {
       if (runResult.isError) {
         throw new Error(getTextContent(runResult));
       }
+
+      const bridgeStatus = await callJsonTool<{ installed: boolean; compatible: boolean }>(
+        client,
+        'get_runtime_bridge_status',
+        { projectPath: scratchFixturePath }
+      );
 
       let runtimeState: RuntimeStateResponse = {
         connected: false,
@@ -358,12 +358,6 @@ async function runRuntimeFlowFixture(): Promise<RuntimeFlowFixtureResult> {
     await prepareFixtureProject();
 
     return await withConnectedClient(async (client, server) => {
-      const bridgeStatus = await callJsonTool<{ installed: boolean }>(
-        client,
-        'install_runtime_bridge',
-        { projectPath: scratchFixturePath }
-      );
-
       const runResult = await callTool(client, 'run_project', {
         projectPath: scratchFixturePath,
         runtimeControl: true,
@@ -372,6 +366,12 @@ async function runRuntimeFlowFixture(): Promise<RuntimeFlowFixtureResult> {
       if (runResult.isError) {
         throw new Error(getTextContent(runResult));
       }
+
+      const bridgeStatus = await callJsonTool<{ installed: boolean; compatible: boolean }>(
+        client,
+        'get_runtime_bridge_status',
+        { projectPath: scratchFixturePath }
+      );
 
       let runtimeState: RuntimeStateResponse = {
         connected: false,
