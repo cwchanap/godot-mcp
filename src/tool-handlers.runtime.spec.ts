@@ -84,7 +84,7 @@ describe('GodotServer metadata', () => {
     await withConnectedClient(server, async (client) => {
       expect(client.getServerVersion()).toEqual({
         name: 'godot-mcp',
-        version: '0.1.3',
+        version: '0.1.4',
       });
     });
   });

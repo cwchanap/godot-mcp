@@ -62,7 +62,7 @@ export class GodotServer {
     this.server = new Server(
       {
         name: 'godot-mcp',
-        version: '0.1.3',
+        version: '0.1.4',
       },
       {
         capabilities: {

@@ -15,6 +15,7 @@ const repoRoot = process.cwd();
 const scratchFixturePath = resolve(repoRoot, '.tmp', 'runtime-control-fixture');
 const fixtureMainScenePath = join(scratchFixturePath, 'Main.tscn');
 const fixtureButtonPath = '/root/Main/RuntimeTestButton';
+const fixturePauseTreeButtonPath = '/root/Main/PauseTreeButton';
 const fixturePauseRenderingButtonPath = '/root/Main/PauseRenderingButton';
 const fixtureTargetScenePath = 'res://Level1.tscn';
 
@@ -68,6 +69,15 @@ type RuntimeStateResponse = {
   connected: boolean;
   sessionId: string | null;
   scenePath: string | null;
+};
+
+type PausedTreeFixtureResult = {
+  bridgeInstalled: boolean;
+  connectedBeforePause: boolean;
+  connectedAfterPause: boolean;
+  findNodeAfterPause: {
+    nodeType: string;
+  };
 };
 
 type FindNodeResponse = {
@@ -219,6 +229,12 @@ async function injectFixtureScene(): Promise<void> {
       '\n\nfunc _on_pause_rendering_button_pressed():\n\tRenderingServer.render_loop_enabled = false\n"\n\n[node name="Main" type="Node2D"]'
     );
   }
+  if (!mainScene.includes('func _on_pause_tree_button_pressed():')) {
+    mainScene = mainScene.replace(
+      '\n"\n\n[node name="Main" type="Node2D"]',
+      '\n\nfunc _on_pause_tree_button_pressed():\n\tget_tree().paused = true\n"\n\n[node name="Main" type="Node2D"]'
+    );
+  }
 
   const backgroundBlock = [
     '',
@@ -244,6 +260,14 @@ async function injectFixtureScene(): Promise<void> {
     '[connection signal="pressed" from="PauseRenderingButton" to="." method="_on_pause_rendering_button_pressed"]',
     '',
   ].join('\n');
+  const pauseTreeButtonBlock = [
+    '',
+    '[node name="PauseTreeButton" type="Button" parent="."]',
+    'text = "Pause Tree"',
+    '',
+    '[connection signal="pressed" from="PauseTreeButton" to="." method="_on_pause_tree_button_pressed"]',
+    '',
+  ].join('\n');
 
   if (!mainScene.includes('[node name="CaptureBackground" type="ColorRect" parent="."]')) {
     mainScene = `${mainScene.trimEnd()}\n${backgroundBlock}`;
@@ -254,8 +278,79 @@ async function injectFixtureScene(): Promise<void> {
   if (!mainScene.includes('[node name="PauseRenderingButton" type="Button" parent="."]')) {
     mainScene = `${mainScene.trimEnd()}\n${pauseRenderingButtonBlock}`;
   }
+  if (!mainScene.includes('[node name="PauseTreeButton" type="Button" parent="."]')) {
+    mainScene = `${mainScene.trimEnd()}\n${pauseTreeButtonBlock}`;
+  }
 
   await writeFile(fixtureMainScenePath, `${mainScene.trimEnd()}\n`, 'utf8');
+}
+
+async function runPausedTreeFixture(): Promise<PausedTreeFixtureResult> {
+  try {
+    await prepareFixtureProject();
+
+    return await withConnectedClient(async (client, server) => {
+      const bridgeStatus = await callJsonTool<{ installed: boolean }>(
+        client,
+        'install_runtime_bridge',
+        { projectPath: scratchFixturePath }
+      );
+
+      const runResult = await callTool(client, 'run_project', {
+        projectPath: scratchFixturePath,
+        runtimeControl: true,
+      });
+
+      if (runResult.isError) {
+        throw new Error(getTextContent(runResult));
+      }
+
+      let runtimeState: RuntimeStateResponse = {
+        connected: false,
+        sessionId: null,
+        scenePath: null,
+      };
+      await vi.waitFor(async () => {
+        runtimeState = await callJsonTool<RuntimeStateResponse>(client, 'get_runtime_state');
+        expect(runtimeState.connected).toBe(true);
+      }, {
+        timeout: 60000,
+        interval: 500,
+      });
+
+      const pauseTree = await callJsonTool<RuntimeActionResponse>(client, 'invoke_node_action', {
+        nodePath: fixturePauseTreeButtonPath,
+        action: 'press',
+      });
+      if (pauseTree.ok !== true) {
+        throw new Error(pauseTree.error ?? 'Could not pause the SceneTree.');
+      }
+
+      const findNodeAfterPause = await callJsonTool<FindNodeResponse>(client, 'find_node', {
+        nodePath: fixtureButtonPath,
+      });
+      if (findNodeAfterPause.ok !== true || !findNodeAfterPause.result?.nodeType) {
+        throw new Error(findNodeAfterPause.error ?? 'find_node did not respond after pausing the SceneTree.');
+      }
+
+      const pausedRuntimeState = await callJsonTool<RuntimeStateResponse>(client, 'get_runtime_state');
+      const stopResult = await callTool(client, 'stop_project');
+      if (stopResult.isError) {
+        throw new Error(getTextContent(stopResult));
+      }
+
+      return {
+        bridgeInstalled: bridgeStatus.installed,
+        connectedBeforePause: runtimeState.connected,
+        connectedAfterPause: pausedRuntimeState.connected,
+        findNodeAfterPause: {
+          nodeType: findNodeAfterPause.result.nodeType,
+        },
+      };
+    });
+  } finally {
+    await rm(scratchFixturePath, { recursive: true, force: true });
+  }
 }
 
 async function runRuntimeFlowFixture(): Promise<RuntimeFlowFixtureResult> {
@@ -424,5 +519,14 @@ describe.skipIf(!hasGodot)('runtime control integration', () => {
     expect(result.capture.width).toBe(1280);
     expect(result.capture.height).toBe(720);
     expect(result.capture.pausedCaptures).toHaveLength(2);
+  }, 120000);
+
+  it('keeps the bridge connected and responsive while the SceneTree is paused', async () => {
+    const result = await runPausedTreeFixture();
+
+    expect(result.bridgeInstalled).toBe(true);
+    expect(result.connectedBeforePause).toBe(true);
+    expect(result.connectedAfterPause).toBe(true);
+    expect(result.findNodeAfterPause.nodeType).toBe('Button');
   }, 120000);
 });

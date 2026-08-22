@@ -18,6 +18,7 @@ func _ready() -> void:
     _read_launch_configuration()
     if _port <= 0 or _token.is_empty() or _session_id.is_empty():
         return
+    process_mode = Node.PROCESS_MODE_ALWAYS
     set_process(true)
     _connect_to_server()
 
