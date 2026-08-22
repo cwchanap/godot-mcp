@@ -216,6 +216,7 @@ describe('ToolHandlers runtime bridge auto-ensure', () => {
     const result = await handlers.handleRunProject({ projectPath });
 
     expect(result.isError).not.toBe(true);
+    expect(result.content[0].text).not.toContain('Runtime control enabled');
     expect(runtimeManager.ensureBridge).not.toHaveBeenCalled();
     expect(runtimeManager.startSession).not.toHaveBeenCalled();
   });
