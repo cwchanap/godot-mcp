@@ -121,15 +121,33 @@ describe('RuntimeControlManager.ensureBridge', () => {
     await expect(readFile(bridgeScript, 'utf8')).resolves.toContain(bridgeVersion);
   });
 
+  it('repairs a corrupted bridge script even when the manifest version is current', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: assetsPath });
+    await manager.ensureBridge(projectPath);
+    await writeFile(bridgeScript, 'corrupted bridge script');
+
+    const result = await manager.ensureBridge(projectPath);
+
+    expect(result).toEqual({
+      installed: true,
+      version: bridgeVersion,
+      compatible: true,
+      action: 'updated',
+    });
+    await expect(readFile(bridgeScript, 'utf8')).resolves.toContain(bridgeVersion);
+  });
+
   it('does not rewrite an already compatible bridge', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: assetsPath });
     await manager.ensureBridge(projectPath);
-    await writeFile(bridgeScript, 'sentinel-current-bridge');
+    const scriptBefore = await readFile(bridgeScript, 'utf8');
+    const projectBefore = await readFile(projectFile, 'utf8');
 
     const result = await manager.ensureBridge(projectPath);
 
     expect(result.action).toBe('unchanged');
-    await expect(readFile(bridgeScript, 'utf8')).resolves.toBe('sentinel-current-bridge');
+    await expect(readFile(bridgeScript, 'utf8')).resolves.toBe(scriptBefore);
+    await expect(readFile(projectFile, 'utf8')).resolves.toBe(projectBefore);
   });
 });
 
