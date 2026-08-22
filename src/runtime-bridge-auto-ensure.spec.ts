@@ -134,7 +134,8 @@ describe('RuntimeControlManager.ensureBridge', () => {
       compatible: true,
       action: 'updated',
     });
-    await expect(readFile(bridgeScript, 'utf8')).resolves.toContain(bridgeVersion);
+    const managedScript = await readFile(path.join(assetsPath, 'runtime_bridge.gd'), 'utf8');
+    await expect(readFile(bridgeScript, 'utf8')).resolves.toBe(managedScript);
   });
 
   it('does not rewrite an already compatible bridge', async () => {
