@@ -115,7 +115,14 @@ export interface RuntimeControlSessionManager {
   cleanup(): Promise<void>;
 }
 
+export type RuntimeBridgeEnsureAction = 'installed' | 'updated' | 'unchanged';
+
+export interface RuntimeBridgeEnsureResult extends RuntimeBridgeStatus {
+  action: RuntimeBridgeEnsureAction;
+}
+
 export interface RuntimeBridgeManager extends RuntimeControlSessionManager {
+  ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult>;
   installBridge(projectPath: string): Promise<RuntimeBridgeStatus>;
   getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus>;
   updateBridge(projectPath: string): Promise<RuntimeBridgeStatus>;
