@@ -22,6 +22,7 @@ Thumbs.db
 .vscode/
 .idea/
 .codex/
+.claude/settings.local.json
 *.swp
 *.swo
 
