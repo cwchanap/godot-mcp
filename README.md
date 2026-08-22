@@ -101,7 +101,7 @@ The Codex wrapper uses `@cwchanap/godot-plugin@0.1.4`. Its `npx` launch path is 
 After publication, add this repository as a marketplace and install the plugin:
 
 ```bash
-codex plugin marketplace add cwchanap/godot-mcp
+codex plugin marketplace add cwchanap/godot-agent-plugin
 codex plugin add godot-plugin@cwchanap
 ```
 

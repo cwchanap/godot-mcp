@@ -6,7 +6,7 @@
 
 The repository builds a local stdio MCP server from `build/index.js` and currently publishes under the inherited `@coding-solo/godot-mcp` identity. The new distribution must be owned by `cwchanap`, installable by Codex as a plugin, and independent of the upstream creator's npm namespace.
 
-The GitHub repository and local checkout remain named `godot-mcp`. Renaming either is explicitly outside this change.
+The GitHub repository is `cwchanap/godot-agent-plugin`; the local checkout remains named `godot-mcp`.
 
 ## Goals
 
@@ -19,7 +19,7 @@ The GitHub repository and local checkout remain named `godot-mcp`. Renaming eith
 
 ## Non-goals
 
-- Renaming `cwchanap/godot-mcp` or the local `godot-mcp` checkout.
+- Renaming the local `godot-mcp` checkout.
 - Publishing to npm without a separate explicit approval.
 - Using the repo marketplace as a second local-development MCP launcher.
 - Adding a plugin skill, hosted MCP server, authentication layer, or plugin UI.
@@ -53,9 +53,9 @@ The publishable `package.json` identity is:
 | `name` | `@cwchanap/godot-plugin` |
 | `version` | `0.1.4` |
 | `author` | `cwchanap` |
-| `homepage` | `https://github.com/cwchanap/godot-mcp` |
-| `bugs.url` | `https://github.com/cwchanap/godot-mcp/issues` |
-| `repository.url` | `https://github.com/cwchanap/godot-mcp.git` |
+| `homepage` | `https://github.com/cwchanap/godot-agent-plugin` |
+| `bugs.url` | `https://github.com/cwchanap/godot-agent-plugin/issues` |
+| `repository.url` | `https://github.com/cwchanap/godot-agent-plugin.git` |
 | `publishConfig.access` | `public` |
 | executable | `godot-plugin` -> `./build/index.js` |
 | published files | `build/` only |
@@ -85,8 +85,8 @@ The complete plugin manifest is:
     "name": "cwchanap",
     "url": "https://github.com/cwchanap"
   },
-  "homepage": "https://github.com/cwchanap/godot-mcp",
-  "repository": "https://github.com/cwchanap/godot-mcp",
+  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
+  "repository": "https://github.com/cwchanap/godot-agent-plugin",
   "license": "MIT",
   "keywords": ["godot", "mcp", "codex", "game-development"],
   "mcpServers": "./.mcp.json",
@@ -97,7 +97,7 @@ The complete plugin manifest is:
     "developerName": "cwchanap",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
-    "websiteURL": "https://github.com/cwchanap/godot-mcp",
+    "websiteURL": "https://github.com/cwchanap/godot-agent-plugin",
     "defaultPrompt": [
       "Inspect this Godot project and summarize its structure.",
       "Run this Godot project and diagnose any errors.",

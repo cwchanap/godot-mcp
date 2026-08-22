@@ -96,13 +96,13 @@ describe('Godot plugin package identity', () => {
       description: 'MCP server for interfacing with Godot game engine. Provides tools for launching the editor, running projects, and capturing debug output.',
       keywords: ['godot', 'mcp', 'ai', 'claude', 'cline'],
       author: 'cwchanap',
-      homepage: 'https://github.com/cwchanap/godot-mcp',
+      homepage: 'https://github.com/cwchanap/godot-agent-plugin',
       bugs: {
-        url: 'https://github.com/cwchanap/godot-mcp/issues',
+        url: 'https://github.com/cwchanap/godot-agent-plugin/issues',
       },
       repository: {
         type: 'git',
-        url: 'https://github.com/cwchanap/godot-mcp.git',
+        url: 'https://github.com/cwchanap/godot-agent-plugin.git',
       },
       publishConfig: {
         access: 'public',
@@ -130,8 +130,8 @@ describe('Codex plugin wrapper identity', () => {
         name: 'cwchanap',
         url: 'https://github.com/cwchanap',
       },
-      homepage: 'https://github.com/cwchanap/godot-mcp',
-      repository: 'https://github.com/cwchanap/godot-mcp',
+      homepage: 'https://github.com/cwchanap/godot-agent-plugin',
+      repository: 'https://github.com/cwchanap/godot-agent-plugin',
       license: 'MIT',
       keywords: ['godot', 'mcp', 'codex', 'game-development'],
       mcpServers: './.mcp.json',
@@ -142,7 +142,7 @@ describe('Codex plugin wrapper identity', () => {
         developerName: 'cwchanap',
         category: 'Developer Tools',
         capabilities: ['Read', 'Write'],
-        websiteURL: 'https://github.com/cwchanap/godot-mcp',
+        websiteURL: 'https://github.com/cwchanap/godot-agent-plugin',
         defaultPrompt: [
           'Inspect this Godot project and summarize its structure.',
           'Run this Godot project and diagnose any errors.',

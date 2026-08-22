@@ -6,8 +6,8 @@
     "name": "cwchanap",
     "url": "https://github.com/cwchanap"
   },
-  "homepage": "https://github.com/cwchanap/godot-mcp",
-  "repository": "https://github.com/cwchanap/godot-mcp",
+  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
+  "repository": "https://github.com/cwchanap/godot-agent-plugin",
   "license": "MIT",
   "keywords": ["godot", "mcp", "codex", "game-development"],
   "mcpServers": "./.mcp.json",
@@ -18,7 +18,7 @@
     "developerName": "cwchanap",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
-    "websiteURL": "https://github.com/cwchanap/godot-mcp",
+    "websiteURL": "https://github.com/cwchanap/godot-agent-plugin",
     "defaultPrompt": [
       "Inspect this Godot project and summarize its structure.",
       "Run this Godot project and diagnose any errors.",
