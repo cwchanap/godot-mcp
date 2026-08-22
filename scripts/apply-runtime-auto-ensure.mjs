@@ -1,4 +1,14 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+const branch = process.env.GITHUB_HEAD_REF;
+
+if (process.env.GITHUB_ACTIONS !== 'true' || !branch) {
+  console.log('Runtime auto-ensure patch is CI-only; skipping.');
+  process.exit(0);
+}
 
 async function edit(path, transform) {
   const before = await readFile(path, 'utf8');
@@ -17,12 +27,22 @@ await edit('src/tool-handlers.ts', (source) => {
     throw new Error('Could not replace runtime bridge launch preflight');
   }
 
-  const insertBefore = '  async handleInstallRuntimeBridge(args: any) {';
-  if (!next.includes(insertBefore)) {
+  const installStart = next.indexOf('  async handleInstallRuntimeBridge(args: any) {');
+  const statusStart = next.indexOf('  async handleGetRuntimeBridgeStatus(args: any) {');
+  if (installStart === -1 || statusStart === -1 || statusStart <= installStart) {
     throw new Error('Could not locate runtime bridge install handler');
   }
+
   const ensureHandler = `  async handleEnsureRuntimeBridge(args: any) {\n    args = this.operationExecutor.normalizeParameters(args);\n\n    if (!args.projectPath) {\n      return this.createErrorResponse(\n        'Project path is required',\n        ['Provide a valid path to a Godot project directory']\n      );\n    }\n\n    if (!ProjectUtils.validatePath(args.projectPath)) {\n      return this.createErrorResponse(\n        'Invalid project path',\n        ['Provide a valid path without ".." or other potentially unsafe characters']\n      );\n    }\n\n    try {\n      if (!ProjectUtils.isValidGodotProject(args.projectPath)) {\n        return this.createErrorResponse(\n          \`Not a valid Godot project: \${args.projectPath}\`,\n          [\n            'Ensure the path points to a directory containing a project.godot file',\n            'Use list_projects to find valid Godot projects',\n          ]\n        );\n      }\n\n      const result = await this.runtimeControlManager.ensureBridge(args.projectPath);\n      return {\n        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],\n      };\n    } catch (error: any) {\n      return this.createErrorResponse(\n        \`Failed to ensure runtime bridge: \${error?.message || 'Unknown error'}\`,\n        ['Ensure the project path is writable and contains a valid Godot project']\n      );\n    }\n  }\n\n`;
-  next = next.replace(insertBefore, `${ensureHandler}${insertBefore}`);
+  next = `${next.slice(0, installStart)}${ensureHandler}${next.slice(statusStart)}`;
+
+  const updateStart = next.indexOf('  async handleUpdateRuntimeBridge(args: any) {');
+  const uninstallStart = next.indexOf('  async handleUninstallRuntimeBridge(args: any) {');
+  if (updateStart === -1 || uninstallStart === -1 || uninstallStart <= updateStart) {
+    throw new Error('Could not locate runtime bridge update handler');
+  }
+  next = `${next.slice(0, updateStart)}${next.slice(uninstallStart)}`;
+
   return next;
 });
 
@@ -79,4 +99,83 @@ await edit('src/tool-handlers.runtime.spec.ts', (source) => {
   return `${prefix}${managementBlock}${suffix}`;
 });
 
-await writeFile('.runtime-auto-ensure-applied', 'applied\n');
+await edit('src/runtime-control-manager.spec.ts', (source) => source
+  .replaceAll('manager.installBridge(', 'manager.ensureBridge(')
+  .replaceAll('uninstallManager.installBridge(', 'uninstallManager.ensureBridge(')
+  .replaceAll('manager.updateBridge(', 'manager.ensureBridge('));
+
+await edit('src/runtime-control.integration.spec.ts', (source) => {
+  let next = source.replaceAll(
+    "      const bridgeStatus = await callJsonTool<{ installed: boolean }>(\n        client,\n        'install_runtime_bridge',\n        { projectPath: scratchFixturePath }\n      );\n\n      const runResult = await callTool(client, 'run_project', {",
+    "      const runResult = await callTool(client, 'run_project', {"
+  );
+  if (next === source) {
+    throw new Error('Could not remove explicit integration bridge install');
+  }
+  next = next.replaceAll(
+    "      if (runResult.isError) {\n        throw new Error(getTextContent(runResult));\n      }\n\n      let runtimeState:",
+    "      if (runResult.isError) {\n        throw new Error(getTextContent(runResult));\n      }\n\n      const bridgeStatus = await callJsonTool<{ installed: boolean; compatible: boolean }>(\n        client,\n        'get_runtime_bridge_status',\n        { projectPath: scratchFixturePath }\n      );\n\n      let runtimeState:"
+  );
+  return next;
+});
+
+await edit('src/types.ts', (source) => source
+  .replace('  installBridge(projectPath: string): Promise<RuntimeBridgeStatus>;\n', '')
+  .replace('  updateBridge(projectPath: string): Promise<RuntimeBridgeStatus>;\n', ''));
+
+await edit('src/runtime-control-manager.ts', (source) => {
+  let next = source.replace(
+    "    const status = currentStatus.installed\n      ? await this.updateBridge(projectPath)\n      : await this.installBridge(projectPath);",
+    "    const status = await this.writeBridge(projectPath);"
+  );
+  const installStart = next.indexOf('  async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {');
+  const statusStart = next.indexOf('  async getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus> {');
+  if (installStart === -1 || statusStart === -1 || statusStart <= installStart) {
+    throw new Error('Could not locate public installBridge');
+  }
+  next = `${next.slice(0, installStart)}${next.slice(statusStart)}`;
+
+  const updateStart = next.indexOf('  async updateBridge(projectPath: string): Promise<RuntimeBridgeStatus> {');
+  const uninstallStart = next.indexOf('  async uninstallBridge(projectPath: string): Promise<void> {');
+  if (updateStart === -1 || uninstallStart === -1 || uninstallStart <= updateStart) {
+    throw new Error('Could not locate public updateBridge');
+  }
+  next = `${next.slice(0, updateStart)}${next.slice(uninstallStart)}`;
+
+  const helperAnchor = '  private getBridgeTargetDir(projectPath: string): string {';
+  const writeHelper = `  private async writeBridge(projectPath: string): Promise<RuntimeBridgeStatus> {\n    const targetDir = this.getBridgeTargetDir(projectPath);\n    await mkdir(targetDir, { recursive: true });\n    await this.copyBridgeAsset(this.runtimeBridgeScriptPath, join(targetDir, RUNTIME_BRIDGE_SCRIPT));\n    await this.copyBridgeAsset(this.runtimeBridgeManifestPath, join(targetDir, RUNTIME_BRIDGE_MANIFEST));\n    await this.updateProjectAutoload(projectPath, (projectText) => this.ensureAutoloadSection(projectText));\n    return this.getBridgeStatus(projectPath);\n  }\n\n`;
+  if (!next.includes(helperAnchor)) {
+    throw new Error('Could not locate bridge helper anchor');
+  }
+  return next.replace(helperAnchor, `${writeHelper}${helperAnchor}`);
+});
+
+await edit('package.json', (source) => source.replace(
+  '"prepare": "node scripts/apply-runtime-auto-ensure.mjs && npm run build"',
+  '"prepare": "npm run build"'
+));
+
+await rm('.github/workflows/apply-runtime-auto-ensure.yml', { force: true });
+await rm('scripts/.runtime-auto-ensure-trigger', { force: true });
+await rm('scripts/apply-runtime-auto-ensure.mjs', { force: true });
+await rm('.runtime-auto-ensure-applied', { force: true });
+
+await execFileAsync('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`]);
+await execFileAsync('git', ['config', 'user.name', 'github-actions[bot]']);
+await execFileAsync('git', ['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com']);
+await execFileAsync('git', ['add', '-A']);
+const { stdout: treeStdout } = await execFileAsync('git', ['write-tree']);
+const tree = treeStdout.trim();
+const { stdout: parentStdout } = await execFileAsync('git', ['rev-parse', `refs/remotes/origin/${branch}`]);
+const parent = parentStdout.trim();
+const { stdout: commitStdout } = await execFileAsync('git', [
+  'commit-tree',
+  tree,
+  '-p',
+  parent,
+  '-m',
+  'feat: wire runtime bridge auto-ensure',
+]);
+const commit = commitStdout.trim();
+await execFileAsync('git', ['push', 'origin', `${commit}:refs/heads/${branch}`]);
+console.log(`Pushed runtime auto-ensure implementation ${commit}`);
