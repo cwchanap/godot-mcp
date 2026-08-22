@@ -947,7 +947,7 @@ describe('RuntimeControlManager', () => {
         2
       )
     );
-    await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(sourceBridgeScriptPath, 'utf8'));
+    await writeFile(path.join(bridgeDir, 'runtime_bridge.gd'), await readFile(path.join(generatedAssetsPath, 'runtime_bridge.gd'), 'utf8'));
     // project.godot has no [autoload] section — default from beforeEach
 
     expect(await manager.getBridgeStatus(projectPath)).toEqual({
