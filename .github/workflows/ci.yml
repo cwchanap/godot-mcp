@@ -43,6 +43,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Smoke packed CLI
+        run: npm run smoke:packed
+
   unit_test:
     name: Unit Tests
     runs-on: ubuntu-latest
