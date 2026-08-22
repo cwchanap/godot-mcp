@@ -102,13 +102,13 @@ describe('Godot plugin package identity', () => {
       },
       repository: {
         type: 'git',
-        url: 'https://github.com/cwchanap/godot-agent-plugin.git',
+        url: 'git+https://github.com/cwchanap/godot-agent-plugin.git',
       },
       publishConfig: {
         access: 'public',
       },
       bin: {
-        'godot-plugin': './build/index.js',
+        'godot-plugin': 'build/index.js',
       },
       files: ['build'],
     });

@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Keep the GitHub repository and local checkout named `godot-mcp`; do not rename either.
-- Publishable npm identity is exactly `@cwchanap/godot-plugin@0.1.4` with executable `godot-plugin -> ./build/index.js`.
+- Publishable npm identity is exactly `@cwchanap/godot-plugin@0.1.4` with executable `godot-plugin -> build/index.js`.
 - Preserve MCP protocol identity `godot-mcp` and plugin MCP server key `godot`, retaining the `mcp__godot__*` tool namespace.
 - Keep version `0.1.4` synchronized across `package.json`, `GodotServer` metadata, plugin manifest, and `.mcp.json` package pin.
 - Keep the package public through `publishConfig.access: "public"` and publish only `build/` plus npm's automatic metadata files.
@@ -111,13 +111,13 @@ describe('Godot plugin package identity', () => {
       },
       repository: {
         type: 'git',
-        url: 'https://github.com/cwchanap/godot-agent-plugin.git',
+        url: 'git+https://github.com/cwchanap/godot-agent-plugin.git',
       },
       publishConfig: {
         access: 'public',
       },
       bin: {
-        'godot-plugin': './build/index.js',
+        'godot-plugin': 'build/index.js',
       },
       files: ['build'],
     });
@@ -180,7 +180,7 @@ Set these exact fields in `package.json`, preserving all unshown fields and depe
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/cwchanap/godot-agent-plugin.git"
+    "url": "git+https://github.com/cwchanap/godot-agent-plugin.git"
   },
   "license": "MIT",
   "author": "cwchanap",
@@ -188,7 +188,7 @@ Set these exact fields in `package.json`, preserving all unshown fields and depe
     "access": "public"
   },
   "bin": {
-    "godot-plugin": "./build/index.js"
+    "godot-plugin": "build/index.js"
   },
   "files": [
     "build"

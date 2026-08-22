@@ -55,9 +55,9 @@ The publishable `package.json` identity is:
 | `author` | `cwchanap` |
 | `homepage` | `https://github.com/cwchanap/godot-agent-plugin` |
 | `bugs.url` | `https://github.com/cwchanap/godot-agent-plugin/issues` |
-| `repository.url` | `https://github.com/cwchanap/godot-agent-plugin.git` |
+| `repository.url` | `git+https://github.com/cwchanap/godot-agent-plugin.git` |
 | `publishConfig.access` | `public` |
-| executable | `godot-plugin` -> `./build/index.js` |
+| executable | `godot-plugin` -> `build/index.js` |
 | published files | `build/` only |
 
 The package description and keywords continue to describe a general Godot MCP server rather than a Codex-only integration. The MIT license retains `Copyright (c) 2025 Solomon Elias`; the README adds fork/publisher attribution without replacing that notice.
