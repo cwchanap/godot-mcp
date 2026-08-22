@@ -251,11 +251,13 @@ export class ToolHandlers {
       }
 
       const shouldStartRuntimeControl = args.runtimeControl === true;
+      let bridgeEnsureAction: 'installed' | 'updated' | 'unchanged' | null = null;
 
       // Prepare the bridge BEFORE killing the existing process so a failed
       // install/update does not leave the user without a running game.
       if (shouldStartRuntimeControl) {
-        await this.runtimeControlManager.ensureBridge(args.projectPath);
+        const bridgeResult = await this.runtimeControlManager.ensureBridge(args.projectPath);
+        bridgeEnsureAction = bridgeResult.action;
       }
 
       // Kill any existing process — clear activeProcess synchronously before any
@@ -333,11 +335,15 @@ export class ToolHandlers {
 
       this.activeProcess = { process, output, errors };
 
+      const runtimeMessage = shouldStartRuntimeControl
+        ? ` Runtime control enabled; bridge ${bridgeEnsureAction}.`
+        : '';
+
       return {
         content: [
           {
             type: 'text',
-            text: `Godot project started in debug mode. Use get_debug_output to see output.`,
+            text: `Godot project started in debug mode.${runtimeMessage} Use get_debug_output to see output.`,
           },
         ],
       };
