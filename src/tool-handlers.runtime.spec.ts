@@ -723,9 +723,8 @@ describe('ToolHandlers runtime bridge project validation', () => {
   });
 
   it.each([
-    ['handleInstallRuntimeBridge', 'installBridge', 'Failed to install runtime bridge'],
+    ['handleEnsureRuntimeBridge', 'ensureBridge', 'Failed to ensure runtime bridge'],
     ['handleGetRuntimeBridgeStatus', 'getBridgeStatus', 'Failed to get runtime bridge status'],
-    ['handleUpdateRuntimeBridge', 'updateBridge', 'Failed to update runtime bridge'],
     ['handleUninstallRuntimeBridge', 'uninstallBridge', 'Failed to uninstall runtime bridge'],
   ] as const)(
     'rejects non-Godot projects in %s',
@@ -734,9 +733,8 @@ describe('ToolHandlers runtime bridge project validation', () => {
         startSession: vi.fn(),
         stopSession: vi.fn().mockResolvedValue(undefined),
         cleanup: vi.fn().mockResolvedValue(undefined),
-        installBridge: vi.fn(),
+        ensureBridge: vi.fn(),
         getBridgeStatus: vi.fn(),
-        updateBridge: vi.fn(),
         uninstallBridge: vi.fn(),
       };
       const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
