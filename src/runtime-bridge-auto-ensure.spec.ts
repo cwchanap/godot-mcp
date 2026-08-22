@@ -176,6 +176,7 @@ describe('ToolHandlers runtime bridge auto-ensure', () => {
     const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
 
     expect(result.isError).not.toBe(true);
+    expect(result.content[0].text).toContain('Runtime control enabled; bridge installed.');
     expect(runtimeManager.ensureBridge).toHaveBeenCalledWith(projectPath);
     expect(runtimeManager.ensureBridge.mock.invocationCallOrder[0])
       .toBeLessThan(runtimeManager.startSession.mock.invocationCallOrder[0]);
