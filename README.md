@@ -96,7 +96,7 @@ Godot MCP enables AI agents to launch the Godot editor, run projects, capture de
 
 ### Codex Plugin (pending publication)
 
-The Codex wrapper uses `@cwchanap/godot-plugin@0.1.4`. Its `npx` launch path is unavailable until that package is published to npm.
+The Codex wrapper uses `@cwchanap/godot-plugin@0.1.4`. Its `npx` launch path and marketplace installation are unavailable until that package is published to npm and the marketplace entry is enabled.
 
 After publication, add this repository as a marketplace and install the plugin:
 
@@ -107,18 +107,20 @@ codex plugin add godot-plugin@cwchanap
 
 Start a new Codex task after installation so the `mcp__godot__*` tools are loaded. If Godot is not discovered automatically, set `GODOT_PATH` in the environment that launches Codex and reopen the task.
 
+The npm-based client examples below also require `@cwchanap/godot-plugin` to be published. Until then, use **Building from Source** below; it is the working installation path for this fork.
+
 ### Claude Code
 
 ```bash
-claude mcp add godot -- npx @coding-solo/godot-mcp
+claude mcp add godot -- npx @cwchanap/godot-plugin
 ```
 
-That's it. Restart Claude Code and your Godot MCP tools are available.
+After the npm package is published, restart Claude Code and your Godot MCP tools are available.
 
 With environment variables:
 
 ```bash
-claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx @coding-solo/godot-mcp
+claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx @cwchanap/godot-plugin
 ```
 
 <details>
@@ -131,7 +133,7 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
+      "args": ["@cwchanap/godot-plugin"],
       "env": {
         "DEBUG": "true"
       },
@@ -178,7 +180,7 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
 3. Fill out the form:
    - Name: `godot`
    - Type: `command`
-   - Command: `npx @coding-solo/godot-mcp`
+   - Command: `npx @cwchanap/godot-plugin`
 4. Click "Add"
 5. You may need to press the refresh button in the top right corner of the MCP server card to populate the tool list
 
@@ -191,7 +193,7 @@ Create a file at `.cursor/mcp.json` in your project directory:
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
+      "args": ["@cwchanap/godot-plugin"],
       "env": {
         "DEBUG": "true"
       }
@@ -212,7 +214,7 @@ For any MCP-compatible client, use this configuration:
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
+      "args": ["@cwchanap/godot-plugin"],
       "env": {
         "GODOT_PATH": "/path/to/godot",
         "DEBUG": "true"
@@ -235,13 +237,13 @@ For any MCP-compatible client, use this configuration:
 <summary><strong>Building from Source</strong></summary>
 
 ```bash
-git clone https://github.com/Coding-Solo/godot-mcp.git
-cd godot-mcp
+git clone https://github.com/cwchanap/godot-agent-plugin.git
+cd godot-agent-plugin
 npm install
 npm run build
 ```
 
-Then point your MCP client to `build/index.js` instead of using `npx`.
+Then point your MCP client to this checkout's `build/index.js` instead of using `npx`.
 
 </details>
 
