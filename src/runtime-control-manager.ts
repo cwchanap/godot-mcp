@@ -336,24 +336,13 @@ export class RuntimeControlManager {
     }
 
     const action = currentStatus.installed ? 'updated' : 'installed';
-    const status = currentStatus.installed
-      ? await this.updateBridge(projectPath)
-      : await this.installBridge(projectPath);
+    const status = await this.writeBridge(projectPath);
 
     if (!status.installed || !status.compatible) {
       throw new Error('Runtime bridge preparation did not produce a compatible managed bridge.');
     }
 
     return { ...status, action };
-  }
-
-  async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
-    const targetDir = this.getBridgeTargetDir(projectPath);
-    await mkdir(targetDir, { recursive: true });
-    await this.copyBridgeAsset(this.runtimeBridgeScriptPath, join(targetDir, RUNTIME_BRIDGE_SCRIPT));
-    await this.copyBridgeAsset(this.runtimeBridgeManifestPath, join(targetDir, RUNTIME_BRIDGE_MANIFEST));
-    await this.updateProjectAutoload(projectPath, (projectText) => this.ensureAutoloadSection(projectText));
-    return this.getBridgeStatus(projectPath);
   }
 
   async getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -394,10 +383,6 @@ export class RuntimeControlManager {
       version,
       compatible: version === this.getGeneratedBridgeVersion(),
     };
-  }
-
-  async updateBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
-    return this.installBridge(projectPath);
   }
 
   async uninstallBridge(projectPath: string): Promise<void> {
@@ -450,6 +435,15 @@ export class RuntimeControlManager {
 
   setDisconnectedForTest(): void {
     this.markDisconnected();
+  }
+
+  private async writeBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
+    const targetDir = this.getBridgeTargetDir(projectPath);
+    await mkdir(targetDir, { recursive: true });
+    await this.copyBridgeAsset(this.runtimeBridgeScriptPath, join(targetDir, RUNTIME_BRIDGE_SCRIPT));
+    await this.copyBridgeAsset(this.runtimeBridgeManifestPath, join(targetDir, RUNTIME_BRIDGE_MANIFEST));
+    await this.updateProjectAutoload(projectPath, (projectText) => this.ensureAutoloadSection(projectText));
+    return this.getBridgeStatus(projectPath);
   }
 
   private getBridgeTargetDir(projectPath: string): string {

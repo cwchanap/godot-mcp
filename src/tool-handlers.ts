@@ -252,28 +252,10 @@ export class ToolHandlers {
 
       const shouldStartRuntimeControl = args.runtimeControl === true;
 
-      // Validate the bridge BEFORE killing the existing process so a failed
-      // preflight check does not leave the user without a running game.
+      // Prepare the bridge BEFORE killing the existing process so a failed
+      // install/update does not leave the user without a running game.
       if (shouldStartRuntimeControl) {
-        const bridgeStatus = await this.runtimeControlManager.getBridgeStatus(args.projectPath);
-        if (!bridgeStatus.installed) {
-          return this.createErrorResponse(
-            'Runtime bridge is not installed. Install it before using runtime control.',
-            [
-              'Use install_runtime_bridge to install the bridge addon first',
-              'Runtime control requires the bridge addon to be present in the project',
-            ]
-          );
-        }
-        if (!bridgeStatus.compatible) {
-          return this.createErrorResponse(
-            `Runtime bridge version ${bridgeStatus.version ?? 'unknown'} is not compatible with the server. Update it before using runtime control.`,
-            [
-              'Use update_runtime_bridge to update the bridge addon to the latest version',
-              'Runtime control requires a compatible bridge addon version',
-            ]
-          );
-        }
+        await this.runtimeControlManager.ensureBridge(args.projectPath);
       }
 
       // Kill any existing process — clear activeProcess synchronously before any
@@ -459,7 +441,7 @@ export class ToolHandlers {
     };
   }
 
-  async handleInstallRuntimeBridge(args: any) {
+  async handleEnsureRuntimeBridge(args: any) {
     args = this.operationExecutor.normalizeParameters(args);
 
     if (!args.projectPath) {
@@ -487,14 +469,14 @@ export class ToolHandlers {
         );
       }
 
-      const status = await this.runtimeControlManager.installBridge(args.projectPath);
+      const result = await this.runtimeControlManager.ensureBridge(args.projectPath);
       return {
-        content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
     } catch (error: any) {
       return this.createErrorResponse(
-        `Failed to install runtime bridge: ${error?.message || 'Unknown error'}`,
-        ['Ensure the project path is accessible and contains a valid Godot project']
+        `Failed to ensure runtime bridge: ${error?.message || 'Unknown error'}`,
+        ['Ensure the project path is writable and contains a valid Godot project']
       );
     }
   }
@@ -534,46 +516,6 @@ export class ToolHandlers {
     } catch (error: any) {
       return this.createErrorResponse(
         `Failed to get runtime bridge status: ${error?.message || 'Unknown error'}`,
-        ['Ensure the project path is accessible and contains a valid Godot project']
-      );
-    }
-  }
-
-  async handleUpdateRuntimeBridge(args: any) {
-    args = this.operationExecutor.normalizeParameters(args);
-
-    if (!args.projectPath) {
-      return this.createErrorResponse(
-        'Project path is required',
-        ['Provide a valid path to a Godot project directory']
-      );
-    }
-
-    if (!ProjectUtils.validatePath(args.projectPath)) {
-      return this.createErrorResponse(
-        'Invalid project path',
-        ['Provide a valid path without ".." or other potentially unsafe characters']
-      );
-    }
-
-    try {
-      if (!ProjectUtils.isValidGodotProject(args.projectPath)) {
-        return this.createErrorResponse(
-          `Not a valid Godot project: ${args.projectPath}`,
-          [
-            'Ensure the path points to a directory containing a project.godot file',
-            'Use list_projects to find valid Godot projects',
-          ]
-        );
-      }
-
-      const status = await this.runtimeControlManager.updateBridge(args.projectPath);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
-      };
-    } catch (error: any) {
-      return this.createErrorResponse(
-        `Failed to update runtime bridge: ${error?.message || 'Unknown error'}`,
         ['Ensure the project path is accessible and contains a valid Godot project']
       );
     }
