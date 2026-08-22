@@ -378,10 +378,16 @@ export class RuntimeControlManager {
       return { installed: true, version: null, compatible: false };
     }
 
+    const [installedScript, managedScript] = await Promise.all([
+      readFile(scriptPath, 'utf8'),
+      readFile(this.runtimeBridgeScriptPath, 'utf8'),
+    ]);
+
     return {
       installed: true,
       version,
-      compatible: version === this.getGeneratedBridgeVersion(),
+      compatible:
+        version === this.getGeneratedBridgeVersion() && installedScript === managedScript,
     };
   }
 
