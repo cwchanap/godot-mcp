@@ -69,7 +69,8 @@ Godot MCP enables AI agents to launch the Godot editor, run projects, capture de
 - **List Godot Projects**: Find Godot projects in a specified directory
 - **Project Analysis**: Get detailed information about project structure
 - **Runtime Bridge Management**:
-  - Install, update, inspect, and remove the managed runtime bridge addon
+  - Automatically install, repair, or update the managed bridge when runtime control is requested
+  - Explicitly ensure, inspect, or remove the managed runtime bridge addon
 - **Runtime Control**:
   - Inspect runtime state for the active game session
   - Find live nodes by path in the running scene tree
@@ -101,7 +102,7 @@ The Codex wrapper uses `@cwchanap/godot-plugin@0.1.4`. Its `npx` launch path is 
 After publication, add this repository as a marketplace and install the plugin:
 
 ```bash
-codex plugin marketplace add cwchanap/godot-mcp
+codex plugin marketplace add cwchanap/godot-agent-plugin
 codex plugin add godot-plugin@cwchanap
 ```
 
@@ -141,6 +142,14 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
         "run_project",
         "get_debug_output",
         "stop_project",
+        "ensure_runtime_bridge",
+        "get_runtime_bridge_status",
+        "uninstall_runtime_bridge",
+        "get_runtime_state",
+        "find_node",
+        "change_scene",
+        "invoke_node_action",
+        "capture_screenshot",
         "get_godot_version",
         "list_projects",
         "get_project_info",
@@ -149,17 +158,18 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
         "load_sprite",
         "export_mesh_library",
         "save_scene",
+        "reimport_asset",
         "get_uid",
         "update_project_uids",
-        "install_runtime_bridge",
-        "get_runtime_bridge_status",
-        "update_runtime_bridge",
-        "uninstall_runtime_bridge",
-        "get_runtime_state",
-        "find_node",
-        "invoke_node_action",
-        "capture_screenshot",
-        "change_scene"
+        "create_tilemap",
+        "create_tileset",
+        "set_tilemap_source",
+        "paint_tiles",
+        "paint_tiles_to_layer",
+        "add_tileset_source",
+        "read_tilemap",
+        "read_tilemap_layer_used_cells",
+        "read_tileset"
       ]
     }
   }
@@ -256,16 +266,19 @@ When running the built CLI directly or through an MCP host that supports `argume
 
 ### Runtime Control Setup
 
-Runtime control requires the managed runtime bridge addon in the target project:
+Runtime control requires the managed runtime bridge addon in the target project, but there is no separate setup step for normal use:
 
-1. Install it with `install_runtime_bridge`.
-2. Check or maintain it with `get_runtime_bridge_status`, `update_runtime_bridge`, or `uninstall_runtime_bridge`.
-3. Start the game with `run_project` and `runtimeControl: true`.
-4. Use `get_runtime_state`, `find_node`, `invoke_node_action`, `change_scene`, and `capture_screenshot` against the running session.
+1. Start the game with `run_project` and `runtimeControl: true`.
+2. The server automatically installs a missing bridge, repairs a partial install, or updates an incompatible bridge before replacing any existing game process.
+3. Use `get_runtime_state`, `find_node`, `invoke_node_action`, `change_scene`, and `capture_screenshot` against the running session.
+
+For explicit maintenance, use `ensure_runtime_bridge` to prepare the bridge without launching the game, `get_runtime_bridge_status` to inspect it, or `uninstall_runtime_bridge` to remove it.
+
+A normal `run_project` call without `runtimeControl: true` does not install or modify the runtime bridge.
 
 ### Runtime Screenshot Capture
 
-`capture_screenshot` requires an active rendered game session started with runtime control and an up-to-date managed runtime bridge. It returns the latest available root-viewport frame, including when the render loop is paused; if the viewport has not produced a usable frame yet, retry after rendering starts. If an installed bridge is older than the server, run `update_runtime_bridge` before starting the session. Headless sessions cannot capture screenshots.
+`capture_screenshot` requires an active rendered game session started with runtime control and a compatible managed runtime bridge. A runtime-controlled launch automatically ensures the bridge is current before the game starts. It returns the latest available root-viewport frame, including when the render loop is paused; if the viewport has not produced a usable frame yet, retry after rendering starts. Headless sessions cannot capture screenshots.
 
 The tool always returns the captured `image/png`, even when an optional persistence write fails. The input is closed: use `{}` to return the image without saving, or choose one managed destination:
 
@@ -298,6 +311,7 @@ The bundled script accepts operation type and parameters as JSON, allowing for f
 - **Godot Not Found**: Set the `GODOT_PATH` environment variable to your Godot executable path
 - **Connection Issues**: Ensure the server is running and restart your AI assistant
 - **Invalid Project Path**: Ensure the path points to a directory containing a `project.godot` file
+- **Runtime Bridge Setup**: If automatic bridge preparation fails, verify the project is writable or call `ensure_runtime_bridge` directly to see the setup error
 - **Build Issues**: Make sure all dependencies are installed by running `npm install`
 
 <details>
