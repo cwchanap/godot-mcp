@@ -1,5 +1,7 @@
 # Runtime Screenshot Capture Implementation Plan
 
+> **v0.1.3 correction:** The completed implementation no longer waits for `RenderingServer.frame_post_draw`. Screenshot capture reads the latest available root-viewport frame after one engine process tick, so paused or non-presenting render loops cannot leave the bridge capture guard locked. The next-frame instructions and snippets below are retained as historical implementation-plan context and are superseded by the design spec.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a `capture_screenshot` MCP tool that returns the active Godot game's next rendered root-viewport frame as PNG and optionally persists it to a managed temporary or project directory.

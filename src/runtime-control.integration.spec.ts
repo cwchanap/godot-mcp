@@ -15,6 +15,7 @@ const repoRoot = process.cwd();
 const scratchFixturePath = resolve(repoRoot, '.tmp', 'runtime-control-fixture');
 const fixtureMainScenePath = join(scratchFixturePath, 'Main.tscn');
 const fixtureButtonPath = '/root/Main/RuntimeTestButton';
+const fixturePauseRenderingButtonPath = '/root/Main/PauseRenderingButton';
 const fixtureTargetScenePath = 'res://Level1.tscn';
 
 type RuntimeFlowFixtureResult = {
@@ -47,6 +48,11 @@ type RuntimeFlowFixtureResult = {
       ok?: boolean;
       error?: string;
     };
+    pausedCaptures: Array<{
+      mimeType: string;
+      width: number;
+      height: number;
+    }>;
   };
 };
 
@@ -207,6 +213,12 @@ async function injectFixtureScene(): Promise<void> {
       'func _ready():\n\tget_viewport().use_hdr_2d = true\n'
     );
   }
+  if (!mainScene.includes('func _on_pause_rendering_button_pressed():')) {
+    mainScene = mainScene.replace(
+      '\n"\n\n[node name="Main" type="Node2D"]',
+      '\n\nfunc _on_pause_rendering_button_pressed():\n\tRenderingServer.render_loop_enabled = false\n"\n\n[node name="Main" type="Node2D"]'
+    );
+  }
 
   const backgroundBlock = [
     '',
@@ -224,12 +236,23 @@ async function injectFixtureScene(): Promise<void> {
     'text = "Runtime Control"',
     '',
   ].join('\n');
+  const pauseRenderingButtonBlock = [
+    '',
+    '[node name="PauseRenderingButton" type="Button" parent="."]',
+    'text = "Pause Rendering"',
+    '',
+    '[connection signal="pressed" from="PauseRenderingButton" to="." method="_on_pause_rendering_button_pressed"]',
+    '',
+  ].join('\n');
 
   if (!mainScene.includes('[node name="CaptureBackground" type="ColorRect" parent="."]')) {
     mainScene = `${mainScene.trimEnd()}\n${backgroundBlock}`;
   }
   if (!mainScene.includes('[node name="RuntimeTestButton" type="Button" parent="."]')) {
     mainScene = `${mainScene.trimEnd()}\n${buttonBlock}`;
+  }
+  if (!mainScene.includes('[node name="PauseRenderingButton" type="Button" parent="."]')) {
+    mainScene = `${mainScene.trimEnd()}\n${pauseRenderingButtonBlock}`;
   }
 
   await writeFile(fixtureMainScenePath, `${mainScene.trimEnd()}\n`, 'utf8');
@@ -330,6 +353,24 @@ async function runRuntimeFlowFixture(): Promise<RuntimeFlowFixtureResult> {
       }) as { ok?: boolean; error?: string };
       expect(retryResponse.ok).toBe(true);
 
+      const pauseRendering = await callJsonTool<RuntimeActionResponse>(client, 'invoke_node_action', {
+        nodePath: fixturePauseRenderingButtonPath,
+        action: 'press',
+      });
+      if (pauseRendering.ok !== true) {
+        throw new Error(pauseRendering.error ?? 'Could not pause the render loop.');
+      }
+
+      const pausedCaptures = [
+        await runtimeManager.captureScreenshot(),
+        await runtimeManager.captureScreenshot(),
+      ];
+      for (const pausedCapture of pausedCaptures) {
+        expect(pausedCapture.mimeType).toBe('image/png');
+        expect(pausedCapture.width).toBe(1280);
+        expect(pausedCapture.height).toBe(720);
+      }
+
       const changeScene = await callJsonTool<RuntimeActionResponse>(client, 'change_scene', {
         scenePath: fixtureTargetScenePath,
       });
@@ -359,6 +400,11 @@ async function runRuntimeFlowFixture(): Promise<RuntimeFlowFixtureResult> {
           pixel,
           concurrentResponses,
           retryResponse,
+          pausedCaptures: pausedCaptures.map((pausedCapture) => ({
+            mimeType: pausedCapture.mimeType,
+            width: pausedCapture.width,
+            height: pausedCapture.height,
+          })),
         },
       };
     });
@@ -377,5 +423,6 @@ describe.skipIf(!hasGodot)('runtime control integration', () => {
     expect(result.capture.mimeType).toBe('image/png');
     expect(result.capture.width).toBe(1280);
     expect(result.capture.height).toBe(720);
+    expect(result.capture.pausedCaptures).toHaveLength(2);
   }, 120000);
 });

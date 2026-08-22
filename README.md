@@ -252,7 +252,7 @@ Runtime control requires the managed runtime bridge addon in the target project:
 
 ### Runtime Screenshot Capture
 
-`capture_screenshot` requires an active rendered game session started with runtime control and an up-to-date managed runtime bridge. If an installed bridge is older than the server, run `update_runtime_bridge` before starting the session. Headless sessions cannot capture screenshots.
+`capture_screenshot` requires an active rendered game session started with runtime control and an up-to-date managed runtime bridge. It returns the latest available root-viewport frame, including when the render loop is paused; if the viewport has not produced a usable frame yet, retry after rendering starts. If an installed bridge is older than the server, run `update_runtime_bridge` before starting the session. Headless sessions cannot capture screenshots.
 
 The tool always returns the captured `image/png`, even when an optional persistence write fails. The input is closed: use `{}` to return the image without saving, or choose one managed destination:
 

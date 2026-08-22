@@ -84,7 +84,7 @@ describe('GodotServer metadata', () => {
     await withConnectedClient(server, async (client) => {
       expect(client.getServerVersion()).toEqual({
         name: 'godot-mcp',
-        version: '0.1.2',
+        version: '0.1.3',
       });
     });
   });
@@ -704,6 +704,7 @@ describe('GodotServer runtime command tools', () => {
       }),
       expect.objectContaining({
         name: 'capture_screenshot',
+        description: 'Capture the latest available rendered frame from the active running Godot game',
         inputSchema: expect.objectContaining({
           properties: expect.objectContaining({
             saveTo: expect.objectContaining({ enum: ['temporary', 'project'] }),

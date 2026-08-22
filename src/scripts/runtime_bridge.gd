@@ -138,7 +138,7 @@ func _capture_screenshot_frame() -> Dictionary:
     if DisplayServer.get_name() == "headless":
         return {"ok": false, "error": "Screenshot capture requires a rendered game session"}
 
-    await RenderingServer.frame_post_draw
+    await get_tree().process_frame
     var viewport := get_viewport()
     var texture := viewport.get_texture()
     var image := texture.get_image()

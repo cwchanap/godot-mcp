@@ -13,7 +13,7 @@ The goal of this design is to add a first-class MCP tool that captures the runni
 - Let the calling agent choose whether to also persist the same PNG.
 - Support persistence only inside the active project or an MCP-managed temporary directory.
 - Reuse the existing authenticated runtime bridge and request/response transport.
-- Capture a fully rendered frame rather than an empty or partially initialized viewport.
+- Capture the latest available fully rendered frame rather than waiting indefinitely for another render.
 - Bound memory and socket usage for image responses.
 - Preserve all existing runtime tools and behavior.
 
@@ -30,7 +30,7 @@ The goal of this design is to add a first-class MCP tool that captures the runni
 
 ## Selected Approach
 
-Extend the managed GDScript runtime bridge with a `capture_screenshot` command. The bridge waits for the next completed render frame, reads the root viewport texture, encodes it as a PNG byte buffer, base64-encodes that buffer, and returns it through the existing authenticated newline-delimited JSON socket.
+Extend the managed GDScript runtime bridge with a `capture_screenshot` command. The bridge yields one engine process tick so simultaneous bridge commands can be rejected, then reads the latest available root viewport texture without waiting for another rendered frame. It encodes the image as a PNG byte buffer, base64-encodes that buffer, and returns it through the existing authenticated newline-delimited JSON socket.
 
 The TypeScript runtime manager validates and decodes the PNG response. It owns all optional filesystem persistence and maps the validated bytes into the MCP image response. The GDScript bridge never receives a caller-controlled path and never writes screenshot files.
 
@@ -145,8 +145,8 @@ On failure, it returns the existing structured error shape:
 3. The manager rejects the request if another capture is already in flight.
 4. The manager sends `capture_screenshot` through the active authenticated socket.
 5. The bridge routes the command through the same async-capable dispatcher used by every command and rejects it if a bridge-side capture is already in flight.
-6. The bridge awaits `RenderingServer.frame_post_draw`.
-7. The bridge reads `get_viewport().get_texture().get_image()` from its root viewport.
+6. The bridge yields one `SceneTree.process_frame`, which continues while rendering is disabled.
+7. The bridge reads the latest available image from `get_viewport().get_texture().get_image()` without waiting for another rendered frame.
 8. The bridge rejects an unavailable, empty, or headless render result.
 9. The bridge normalizes the image to `RGBA8`; when the root viewport uses HDR 2D, it also converts the linear image to sRGB so the PNG matches the displayed colors.
 10. The bridge encodes the image with `save_png_to_buffer()` and enforces the decoded PNG size limit.
@@ -161,7 +161,7 @@ On failure, it returns the existing structured error shape:
 
 Only one screenshot may be in flight for an active runtime session. Both the TypeScript manager and GDScript bridge enforce this invariant. The bridge-side guard is authoritative for GPU readback and encoding; the manager-side guard fails redundant MCP calls before sending them. A concurrent request fails immediately with a retryable `Screenshot capture already in progress` error. The design does not queue captures because queued requests could represent stale frames and multiply expensive GPU readbacks.
 
-Capture uses the existing 10-second reply deadline but not `sendCommand`'s catch-all reconnect policy. A screenshot timeout can mean that a frame was not drawn or PNG encoding was slow; it does not prove that the socket disconnected. The timeout returns a capture-specific error and clears the TypeScript in-flight guard without changing runtime connection state. Socket close remains authoritative for marking the session disconnected. Existing non-screenshot runtime command behavior remains unchanged.
+Capture uses the existing 10-second reply deadline as a transport safety net but not `sendCommand`'s catch-all reconnect policy. The bridge does not wait on a render-presentation signal. A timeout does not prove that the socket disconnected, so it returns a capture-specific error and clears the TypeScript in-flight guard without changing runtime connection state. Socket close remains authoritative for marking the session disconnected. Existing non-screenshot runtime command behavior remains unchanged.
 
 Both the TypeScript and bridge-side in-flight guards must be cleared in guaranteed cleanup paths so failed or timed-out captures do not permanently block later calls. A late bridge response after a TypeScript timeout is ignored through the existing missing-request-ID behavior.
 
@@ -252,7 +252,7 @@ Expected errors include:
 - **socket loss**
   - use the existing reconnect-required behavior after the socket close marks the session disconnected
 
-All capture failures that produce no valid image use the existing MCP error-response convention. A persistence warning is the only partial-success case, and it never silently returns an empty or stale image.
+All capture failures that produce no valid image use the existing MCP error-response convention. A persistence warning is the only partial-success case, and it never silently returns an empty or malformed image.
 
 ## Compatibility and Versioning
 
@@ -305,6 +305,8 @@ Extend the Godot integration fixture with a scene that renders known colors. Lau
 - expected viewport dimensions
 - representative pixels from the known scene
 - expected sRGB pixels from an HDR 2D fixture
+- two successful sequential captures after the render loop is disabled
+- bridge-side concurrent rejection followed by a successful retry
 - temporary persistence
 - project persistence
 
@@ -339,7 +341,7 @@ The current `npx @coding-solo/godot-mcp` installation instructions remain unchan
 
 The feature is complete when:
 
-- an agent can capture the active running game's next fully rendered root viewport frame
+- an agent can capture the active running game's latest available fully rendered root viewport frame
 - the MCP response contains valid `image/png` content and accurate metadata
 - the agent can choose return-only, temporary persistence, or project persistence
 - no caller-controlled path can escape the approved storage roots

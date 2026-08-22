@@ -62,7 +62,7 @@ export class GodotServer {
     this.server = new Server(
       {
         name: 'godot-mcp',
-        version: '0.1.2',
+        version: '0.1.3',
       },
       {
         capabilities: {
@@ -295,7 +295,7 @@ export class GodotServer {
         },
         {
           name: 'capture_screenshot',
-          description: 'Capture the next rendered frame from the active running Godot game',
+          description: 'Capture the latest available rendered frame from the active running Godot game',
           inputSchema: {
             type: 'object',
             properties: {
