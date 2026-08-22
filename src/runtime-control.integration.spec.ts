@@ -21,6 +21,7 @@ const fixtureTargetScenePath = 'res://Level1.tscn';
 
 type RuntimeFlowFixtureResult = {
   bridgeInstalled: boolean;
+  bridgeCompatible: boolean;
   connected: boolean;
   findNode: {
     nodeType: string;
@@ -73,6 +74,7 @@ type RuntimeStateResponse = {
 
 type PausedTreeFixtureResult = {
   bridgeInstalled: boolean;
+  bridgeCompatible: boolean;
   connectedBeforePause: boolean;
   connectedAfterPause: boolean;
   findNodeAfterPause: {
@@ -341,6 +343,7 @@ async function runPausedTreeFixture(): Promise<PausedTreeFixtureResult> {
 
       return {
         bridgeInstalled: bridgeStatus.installed,
+        bridgeCompatible: bridgeStatus.compatible,
         connectedBeforePause: runtimeState.connected,
         connectedAfterPause: pausedRuntimeState.connected,
         findNodeAfterPause: {
@@ -477,6 +480,7 @@ async function runRuntimeFlowFixture(): Promise<RuntimeFlowFixtureResult> {
 
       return {
         bridgeInstalled: bridgeStatus.installed,
+        bridgeCompatible: bridgeStatus.compatible,
         connected: runtimeState.connected,
         findNode: {
           nodeType: findNodeResponse.result.nodeType,
@@ -512,6 +516,7 @@ describe.skipIf(!hasGodot)('runtime control integration', () => {
   it('installs the bridge and controls the sample project end-to-end', async () => {
     const result = await runRuntimeFlowFixture();
     expect(result.bridgeInstalled).toBe(true);
+    expect(result.bridgeCompatible).toBe(true);
     expect(result.connected).toBe(true);
     expect(result.findNode.nodeType).toBe('Button');
     expect(result.changeScene.ok).toBe(true);
@@ -525,6 +530,7 @@ describe.skipIf(!hasGodot)('runtime control integration', () => {
     const result = await runPausedTreeFixture();
 
     expect(result.bridgeInstalled).toBe(true);
+    expect(result.bridgeCompatible).toBe(true);
     expect(result.connectedBeforePause).toBe(true);
     expect(result.connectedAfterPause).toBe(true);
     expect(result.findNodeAfterPause.nodeType).toBe('Button');
