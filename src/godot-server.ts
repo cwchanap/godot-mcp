@@ -34,6 +34,11 @@ type RuntimeToolManager = RuntimeBridgeManager & {
   captureScreenshot(saveTo?: ScreenshotSaveDestination): Promise<ScreenshotCaptureResult>;
 };
 
+export const GODOT_SERVER_INFO = {
+  name: 'godot-mcp',
+  version: '0.1.4',
+} as const;
+
 // Derive __filename and __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,10 +65,7 @@ export class GodotServer {
     this.toolHandlers = new ToolHandlers(this.pathManager, this.operationExecutor, this.runtimeControlManager);
 
     this.server = new Server(
-      {
-        name: 'godot-mcp',
-        version: '0.1.4',
-      },
+      GODOT_SERVER_INFO,
       {
         capabilities: {
           tools: {},
