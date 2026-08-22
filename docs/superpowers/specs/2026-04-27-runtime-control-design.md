@@ -18,14 +18,16 @@ The goal of this design is to add a reliable runtime-control foundation without 
 - Keep the MCP-side implementation inside the existing Node/TypeScript server process.
 - Use a managed runtime addon installed into the target Godot project.
 - Default to a local-only managed install, with the option for teams to commit the addon if they want shared reproducibility.
+- Make a runtime-controlled launch self-preparing: install, repair, or update the managed addon automatically when needed.
 
 ## Non-Goals
 
 - Generic arbitrary GDScript injection into a running game
 - Full editor remote-debugger automation
 - Broad low-level mouse/keyboard replay in the first release
-- Support for controlling completely unmodified projects with no installed addon
+- Support for controlling completely unmodified projects without allowing the managed addon to be installed
 - Covering every possible node type interaction in v1
+- A separate package manager or editor-plugin installation flow for the runtime bridge
 
 ## Selected Approach
 
@@ -50,7 +52,7 @@ There are three primary pieces:
    - captures stdout/stderr
 
 2. **RuntimeControlManager** inside the MCP server
-   - installs, updates, removes, and checks the runtime addon
+   - ensures, removes, and checks the runtime addon
    - starts and owns the local runtime control endpoint for a launched session
    - tracks live bridge connection state
    - validates session tokens and bridge version compatibility
@@ -67,64 +69,71 @@ The only separated artifact is the installed GDScript addon inside the project. 
 
 ## Installation Model
 
-The runtime bridge is shipped as a versioned addon managed by `godot-mcp`.
+The runtime bridge is shipped inside the versioned MCP package and managed by `godot-mcp`.
 
 ### Default behavior
 
-- Install into the target project as a **managed local-only addon**
-- Do not assume the addon is committed to source control
-- Make it easy for users to commit it later if they want shared team setup
+- Install into the target project as a **managed local-only addon** only when runtime control is requested or `ensure_runtime_bridge` is called explicitly.
+- `run_project` with `runtimeControl: true` automatically ensures a compatible bridge before replacing an existing game process.
+- A missing or partial bridge is installed/repaired automatically.
+- An installed but incompatible bridge is updated automatically.
+- An already compatible bridge is left unchanged.
+- A normal `run_project` call without runtime control does not install or modify the addon.
+- Do not assume the addon is committed to source control; teams may commit it later if they want shared reproducibility.
 
 ### Lifecycle tools
 
-- `install_runtime_bridge`
+- `ensure_runtime_bridge`
 - `get_runtime_bridge_status`
-- `update_runtime_bridge`
 - `uninstall_runtime_bridge`
 
 ### Installation responsibilities
 
-`install_runtime_bridge` must:
+`ensure_runtime_bridge` and the launch-time ensure path must:
 
-- copy addon files into the project
-- register exactly one autoload entry in `project.godot`
+- inspect current bridge state first
+- copy managed addon files into the project when missing, partial, or incompatible
+- register exactly one canonical autoload entry in `project.godot`
 - record the installed bridge version in a machine-readable way
+- return the post-ensure bridge state
+- distinguish whether preparation installed, updated, or left the bridge unchanged
 
-`get_runtime_bridge_status` must report:
+`get_runtime_bridge_status` must report without mutating the project:
 
 - installed vs missing
 - installed version
 - compatibility with the current MCP server version
 
-`update_runtime_bridge` must:
-
-- upgrade the installed addon in place
-- preserve a valid autoload entry
-
 `uninstall_runtime_bridge` must:
 
 - remove the addon files it installed
 - remove the autoload entry it owns
-- fail safely if the addon is in use by a running session
+- fail safely if the addon is in use by a running session for that project
+
+### Launch ordering guarantee
+
+Bridge preparation happens before an existing Godot process is stopped or replaced. If install/repair/update fails, `run_project` returns the preparation error and leaves the currently running game and runtime session untouched.
 
 ## Runtime Session Flow
 
 ### Launch and connect
 
-1. The user installs the runtime bridge for a project.
-2. The user starts a project with runtime control enabled.
-3. `godot-mcp` launches a local-only runtime control endpoint from inside the existing server process.
-4. `godot-mcp` starts Godot and passes user args after `--`, including:
+1. The user starts a project with `run_project` and `runtimeControl: true`.
+2. `godot-mcp` ensures the target project has a compatible managed runtime bridge.
+3. If preparation fails, the launch stops before any existing process/session is replaced.
+4. Once preparation succeeds, `godot-mcp` replaces any existing managed game process/session as needed.
+5. `godot-mcp` launches a local-only runtime control endpoint from inside the existing server process.
+6. `godot-mcp` starts Godot and passes user args after `--`, including:
    - ephemeral port or endpoint information
    - short-lived session token
    - optional session identifier
-5. The addon reads the user args at startup.
-6. The addon connects back to the MCP runtime endpoint and sends:
+7. The addon reads the user args at startup.
+8. The addon connects back to the MCP runtime endpoint and sends:
    - bridge version
    - project identity
    - runtime session identity
    - current scene metadata if available
-7. `RuntimeControlManager` marks the session connected and available for runtime tool calls.
+9. `RuntimeControlManager` marks the session connected and available for runtime tool calls.
 
 ### Command flow
 
@@ -139,10 +148,17 @@ The runtime bridge is shipped as a versioned addon managed by `godot-mcp`.
 
 ### Bridge management tools
 
-- `install_runtime_bridge`
+- `ensure_runtime_bridge`
+  - installs a missing bridge
+  - repairs a partial managed install
+  - updates an incompatible installed bridge
+  - leaves a compatible bridge unchanged
+
 - `get_runtime_bridge_status`
-- `update_runtime_bridge`
+  - reads bridge installation/version/compatibility state without modifying the project
+
 - `uninstall_runtime_bridge`
+  - removes the managed bridge when it is not in use by an active session for that project
 
 ### Runtime control tools
 
@@ -162,6 +178,9 @@ The runtime bridge is shipped as a versioned addon managed by `godot-mcp`.
 - `change_scene`
   - requests a scene transition in the running game
   - accepts a scene path and returns the result of the transition request
+
+- `capture_screenshot`
+  - captures the latest usable rendered root-viewport frame from the running game
 
 ## Supported Runtime Actions in v1
 
@@ -192,6 +211,7 @@ Responsibilities:
 - collect minimal runtime metadata
 - dispatch a small allowlisted set of supported actions
 - request scene transitions using the project runtime context
+- return rendered screenshot payloads when requested
 
 The addon should avoid owning unrelated gameplay logic. It exists only to bridge the running project to MCP runtime control.
 
@@ -218,11 +238,13 @@ All runtime-control failures should return explicit structured errors. No silent
 
 Expected cases:
 
-- **bridge not installed**
-  - instruct user to run `install_runtime_bridge`
+- **bridge preparation fails**
+  - return the filesystem/configuration failure from the automatic ensure path
+  - do not stop or replace an existing running game/session
+  - allow `ensure_runtime_bridge` to be called explicitly for the same diagnostic path
 
-- **bridge version mismatch**
-  - instruct user to run `update_runtime_bridge`
+- **bridge version mismatch during handshake**
+  - reject the connection because the running bridge is not the version that was prepared for the session
 
 - **project running but bridge not connected**
   - report disconnected runtime state
@@ -246,7 +268,12 @@ Expected cases:
 
 Add coverage for:
 
-- bridge install/status/update/remove logic
+- bridge ensure/status/remove logic
+- ensure action classification: installed, updated, unchanged
+- partial-install and autoload repair behavior
+- runtime-controlled launch auto-ensure ordering
+- preparation failure preserving an existing running process/session
+- normal launch not mutating bridge state
 - session handshake state transitions
 - token validation
 - version compatibility checks
@@ -266,19 +293,22 @@ Add coverage where practical for:
 
 Use the sample Godot project to verify:
 
-- runtime bridge install/update/remove
+- a clean fixture can start directly with `runtimeControl: true` without a separate install call
+- the bridge reports installed and compatible after the controlled launch
 - runtime handshake after launch
 - `get_runtime_state`
 - `find_node` against known paths
 - `invoke_node_action` for a simple button target
 - `change_scene` to a known scene
-- clear errors for missing addon, disconnected bridge, and invalid node path
+- screenshot capture behavior
+- clear errors for disconnected bridge and invalid node path
 
 ## Rollout Plan
 
 ### Phase 1
 
-- bridge install/status/update/remove
+- idempotent bridge ensure/status/remove
+- automatic bridge preparation during controlled launch
 - runtime handshake and connection tracking
 - `get_runtime_state`
 - `find_node`
@@ -290,8 +320,8 @@ Use the sample Godot project to verify:
 
 ### Phase 3
 
-- optional evaluation of low-level input simulation only if needed after the semantic runtime path is stable
+- screenshot capture and optional evaluation of low-level input simulation only if needed after the semantic runtime path is stable
 
 ## Why This Scope Is Appropriate
 
-This spec covers one cohesive subsystem: **runtime control of a running Godot project through a managed in-project addon**. It does not attempt to solve unrelated editor automation or broad gameplay scripting. The scope is intentionally narrow enough to support a single implementation plan while still delivering meaningful new capability.
+This spec covers one cohesive subsystem: **runtime control of a running Godot project through a managed in-project addon**. Automatic bridge preparation removes a setup step without adding a new installer architecture: it reuses the existing managed addon lifecycle and keeps project mutation limited to runtime-control use. The scope remains focused on runtime control rather than unrelated editor automation or broad gameplay scripting.
