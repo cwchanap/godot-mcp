@@ -10,6 +10,7 @@ import {
   validateScreenshotPayload,
 } from './screenshot-payload.js';
 import type {
+  RuntimeBridgeEnsureResult,
   RuntimeBridgeStatus,
   RuntimeLaunchSession,
   RuntimeState,
@@ -326,6 +327,24 @@ export class RuntimeControlManager {
     if (temporaryCaptureDirectory) {
       await rm(temporaryCaptureDirectory, { recursive: true, force: true });
     }
+  }
+
+  async ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult> {
+    const currentStatus = await this.getBridgeStatus(projectPath);
+    if (currentStatus.installed && currentStatus.compatible) {
+      return { ...currentStatus, action: 'unchanged' };
+    }
+
+    const action = currentStatus.installed ? 'updated' : 'installed';
+    const status = currentStatus.installed
+      ? await this.updateBridge(projectPath)
+      : await this.installBridge(projectPath);
+
+    if (!status.installed || !status.compatible) {
+      throw new Error('Runtime bridge preparation did not produce a compatible managed bridge.');
+    }
+
+    return { ...status, action };
   }
 
   async installBridge(projectPath: string): Promise<RuntimeBridgeStatus> {
