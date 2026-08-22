@@ -1,0 +1,28 @@
+{
+  "name": "godot-plugin",
+  "version": "0.1.4",
+  "description": "Connect Codex to local Godot projects through the Godot MCP server.",
+  "author": {
+    "name": "cwchanap",
+    "url": "https://github.com/cwchanap"
+  },
+  "homepage": "https://github.com/cwchanap/godot-mcp",
+  "repository": "https://github.com/cwchanap/godot-mcp",
+  "license": "MIT",
+  "keywords": ["godot", "mcp", "codex", "game-development"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Godot Plugin",
+    "shortDescription": "Inspect, run, and control local Godot projects.",
+    "longDescription": "Connect Codex to the local Godot editor and runtime for project inspection, scene operations, execution, logs, and runtime controls.",
+    "developerName": "cwchanap",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/cwchanap/godot-mcp",
+    "defaultPrompt": [
+      "Inspect this Godot project and summarize its structure.",
+      "Run this Godot project and diagnose any errors.",
+      "Use Godot tools to implement and verify this change."
+    ]
+  }
+}

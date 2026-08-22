@@ -1,0 +1,20 @@
+{
+  "name": "cwchanap",
+  "interface": {
+    "displayName": "cwchanap"
+  },
+  "plugins": [
+    {
+      "name": "godot-plugin",
+      "source": {
+        "source": "local",
+        "path": "./plugins/godot-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
