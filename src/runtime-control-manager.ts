@@ -330,6 +330,7 @@ export class RuntimeControlManager {
   }
 
   async ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult> {
+    this.getGeneratedBridgeVersion();
     const currentStatus = await this.getBridgeStatus(projectPath);
     if (currentStatus.installed && currentStatus.compatible && currentStatus.version) {
       return {
