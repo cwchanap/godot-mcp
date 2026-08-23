@@ -205,6 +205,7 @@ describe('RuntimeControlManager.ensureBridge', () => {
     await expect(manager.ensureBridge(projectPath)).rejects.toThrow(
       'Generated runtime bridge script is missing:'
     );
+    await expect(readFile(bridgeScript, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
 
