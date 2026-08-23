@@ -1,0 +1,14 @@
+{
+  "name": "cwchanap",
+  "owner": {
+    "name": "cwchanap",
+    "url": "https://github.com/cwchanap"
+  },
+  "plugins": [
+    {
+      "name": "godot-plugin",
+      "source": "./plugins/godot-plugin",
+      "description": "Inspect, run, author, and control local Godot projects through MCP."
+    }
+  ]
+}

@@ -27,7 +27,9 @@
     "access": "public"
   },
   "files": [
-    "build"
+    "build",
+    "plugin.json",
+    "mcp.json"
   ],
   "scripts": {
     "build": "npm run typecheck && tsc -p tsconfig.build.json && node scripts/build.js",
