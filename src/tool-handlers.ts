@@ -257,7 +257,9 @@ export class ToolHandlers {
       // install/update does not leave the user without a running game.
       if (shouldStartRuntimeControl) {
         try {
-          const bridgeResult = await this.runtimeControlManager.ensureBridge(args.projectPath);
+          const bridgeResult = await this.runtimeControlManager.ensureBridge(args.projectPath, {
+            allowActiveSessionMutation: true,
+          });
           runtimeMessage = bridgeResult.action === 'unchanged'
             ? ' Runtime control enabled; bridge unchanged.'
             : ` Runtime control enabled; bridge ${bridgeResult.action} (addons/godot_mcp_runtime/runtime_bridge.gd; project.godot [autoload]).`;

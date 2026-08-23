@@ -10,6 +10,7 @@ import {
   validateScreenshotPayload,
 } from './screenshot-payload.js';
 import type {
+  RuntimeBridgeEnsureOptions,
   RuntimeBridgeEnsureResult,
   RuntimeBridgeStatus,
   RuntimeLaunchSession,
@@ -329,31 +330,40 @@ export class RuntimeControlManager {
     }
   }
 
-  async ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult> {
-    this.getGeneratedBridgeVersion();
+  async ensureBridge(
+    projectPath: string,
+    options: RuntimeBridgeEnsureOptions = {}
+  ): Promise<RuntimeBridgeEnsureResult> {
+    const expectedVersion = this.getGeneratedBridgeVersion();
     const currentStatus = await this.getBridgeStatus(projectPath);
     if (currentStatus.installed && currentStatus.compatible && currentStatus.version) {
-      return {
-        installed: true,
-        version: currentStatus.version,
-        compatible: true,
-        action: 'unchanged',
-      };
+      return { version: currentStatus.version, action: 'unchanged' };
     }
 
     const action = currentStatus.installed ? 'updated' : 'installed';
+
+    // Standalone maintenance must not rewrite files for the project that owns
+    // the live runtime session. Controlled restart explicitly opts in because
+    // run_project replaces that process immediately after successful preflight.
+    if (!options.allowActiveSessionMutation && this.activeSessionId) {
+      const normalizedPath = this.normalizeProjectPath(projectPath);
+      if (
+        !this.activeRuntimeSession ||
+        this.activeRuntimeSession.expectedProjectPath === normalizedPath
+      ) {
+        throw new Error('Cannot modify runtime bridge while a running session is active for this project.');
+      }
+    }
+
     const status = await this.writeBridge(projectPath);
 
     if (!status.installed || !status.compatible || !status.version) {
-      throw new Error('Runtime bridge preparation did not produce a compatible managed bridge.');
+      throw new Error(
+        `Runtime bridge preparation did not produce a compatible managed bridge (installed=${status.installed}, compatible=${status.compatible}, version=${status.version ?? 'null'}, expected=${expectedVersion}, path=${this.getBridgeTargetDir(projectPath)}).`
+      );
     }
 
-    return {
-      installed: true,
-      version: status.version,
-      compatible: true,
-      action,
-    };
+    return { version: status.version, action };
   }
 
   async getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -385,8 +395,11 @@ export class RuntimeControlManager {
     try {
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { version?: string };
       version = manifest.version ?? null;
-    } catch {
-      return { installed: true, version: null, compatible: false };
+    } catch (error: unknown) {
+      if (error instanceof SyntaxError) {
+        return { installed: true, version: null, compatible: false };
+      }
+      throw error;
     }
 
     const [installedScript, managedScript] = await Promise.all([

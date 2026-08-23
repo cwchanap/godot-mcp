@@ -846,10 +846,9 @@ describe('RuntimeControlManager', () => {
 
   it('installs the bridge addon into addons/godot_mcp_runtime', async () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    const status = await manager.ensureBridge(projectPath);
+    const result = await manager.ensureBridge(projectPath);
 
-    expect(status.installed).toBe(true);
-    expect(status.version).toBe(bridgeVersion);
+    expect(result).toEqual({ version: bridgeVersion, action: 'installed' });
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(bridgeVersion);
     await expect(readFile(manifestPath, 'utf8')).resolves.toContain(bridgeVersion);
   });
@@ -1078,13 +1077,9 @@ describe('RuntimeControlManager', () => {
     );
 
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
-    const status = await manager.ensureBridge(projectPath);
+    const result = await manager.ensureBridge(projectPath);
 
-    expect(status).toEqual(expect.objectContaining({
-      installed: true,
-      version: generatedVersion,
-      compatible: true,
-    }));
+    expect(result).toEqual({ version: generatedVersion, action: 'updated' });
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(generatedVersion);
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.not.toContain(staleVersion);
   });

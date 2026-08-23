@@ -49,7 +49,12 @@ Add these types in `src/types.ts`:
 ```ts
 export type RuntimeBridgeEnsureAction = 'installed' | 'updated' | 'unchanged';
 
-export interface RuntimeBridgeEnsureResult extends RuntimeBridgeStatus {
+export interface RuntimeBridgeEnsureOptions {
+  allowActiveSessionMutation?: boolean;
+}
+
+export interface RuntimeBridgeEnsureResult {
+  version: string;
   action: RuntimeBridgeEnsureAction;
 }
 ```
@@ -58,7 +63,7 @@ Update the manager contract to:
 
 ```ts
 export interface RuntimeBridgeManager extends RuntimeControlSessionManager {
-  ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult>;
+  ensureBridge(projectPath: string, options?: RuntimeBridgeEnsureOptions): Promise<RuntimeBridgeEnsureResult>;
   getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus>;
   uninstallBridge(projectPath: string): Promise<void>;
 }
@@ -80,13 +85,13 @@ current status: installed=false
   -> action = "installed"
 ```
 
-The returned `installed`, `version`, and `compatible` fields must describe the **post-ensure** state, not the pre-ensure state.
+The ensure result is intentionally minimal: `{ action, version }`. Successful ensure is the postcondition; callers that need variable `installed`/`compatible` state use `get_runtime_bridge_status`. Standalone ensure refuses same-project mutation while a runtime session is active; controlled restart passes `allowActiveSessionMutation: true` because it replaces that process immediately after successful preflight.
 
 `run_project({ runtimeControl: true })` ordering:
 
 ```text
 validate project
-  -> ensureBridge(projectPath)
+  -> ensureBridge(projectPath, { allowActiveSessionMutation: true })
   -> if ensure fails: return error; keep existing process/session untouched
   -> kill old process and stop old runtime session if present
   -> start new runtime session
@@ -125,9 +130,7 @@ it('installs a missing bridge and reports the install action', async () => {
   const result = await manager.ensureBridge(projectPath);
 
   expect(result).toEqual({
-    installed: true,
     version: bridgeVersion,
-    compatible: true,
     action: 'installed',
   });
   await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(bridgeVersion);
@@ -153,7 +156,12 @@ In `src/types.ts`, add:
 ```ts
 export type RuntimeBridgeEnsureAction = 'installed' | 'updated' | 'unchanged';
 
-export interface RuntimeBridgeEnsureResult extends RuntimeBridgeStatus {
+export interface RuntimeBridgeEnsureOptions {
+  allowActiveSessionMutation?: boolean;
+}
+
+export interface RuntimeBridgeEnsureResult {
+  version: string;
   action: RuntimeBridgeEnsureAction;
 }
 ```
@@ -162,7 +170,7 @@ Replace the install/update methods in `RuntimeBridgeManager` with:
 
 ```ts
 export interface RuntimeBridgeManager extends RuntimeControlSessionManager {
-  ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult>;
+  ensureBridge(projectPath: string, options?: RuntimeBridgeEnsureOptions): Promise<RuntimeBridgeEnsureResult>;
   getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus>;
   uninstallBridge(projectPath: string): Promise<void>;
 }
