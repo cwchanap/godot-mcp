@@ -96,9 +96,7 @@ describe('RuntimeControlManager.ensureBridge', () => {
     const result = await manager.ensureBridge(projectPath);
 
     expect(result).toEqual({
-      installed: true,
       version: bridgeVersion,
-      compatible: true,
       action: 'installed',
     });
     await expect(readFile(projectFile, 'utf8')).resolves.toContain(autoloadLine);
@@ -113,9 +111,7 @@ describe('RuntimeControlManager.ensureBridge', () => {
     const result = await manager.ensureBridge(projectPath);
 
     expect(result).toEqual({
-      installed: true,
       version: bridgeVersion,
-      compatible: true,
       action: 'updated',
     });
     await expect(readFile(bridgeScript, 'utf8')).resolves.toContain(bridgeVersion);
@@ -129,9 +125,7 @@ describe('RuntimeControlManager.ensureBridge', () => {
     const result = await manager.ensureBridge(projectPath);
 
     expect(result).toEqual({
-      installed: true,
       version: bridgeVersion,
-      compatible: true,
       action: 'updated',
     });
     const managedScript = await readFile(path.join(assetsPath, 'runtime_bridge.gd'), 'utf8');
@@ -183,7 +177,7 @@ describe('RuntimeControlManager.ensureBridge', () => {
     });
 
     await expect(manager.ensureBridge(projectPath)).rejects.toThrow(
-      'Runtime bridge preparation did not produce a compatible managed bridge.'
+      `Runtime bridge preparation did not produce a compatible managed bridge (installed=true, compatible=false, version=${bridgeVersion}, expected=${bridgeVersion}, path=${bridgeDir}).`
     );
   });
 
@@ -206,6 +200,31 @@ describe('RuntimeControlManager.ensureBridge', () => {
       'Generated runtime bridge script is missing:'
     );
     await expect(readFile(bridgeScript, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('refuses to mutate the active project bridge outside a controlled restart', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: assetsPath });
+    await manager.ensureBridge(projectPath);
+    await writeFile(bridgeScript, 'corrupted while running');
+    await manager.startSession(projectPath);
+
+    try {
+      await expect(manager.ensureBridge(projectPath)).rejects.toThrow(
+        'Cannot modify runtime bridge while a running session is active for this project.'
+      );
+      await expect(readFile(bridgeScript, 'utf8')).resolves.toBe('corrupted while running');
+    } finally {
+      await manager.stopSession();
+    }
+  });
+
+  it('propagates manifest filesystem errors instead of treating them as incompatibility', async () => {
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: assetsPath });
+    await manager.ensureBridge(projectPath);
+    await rm(bridgeManifest);
+    await mkdir(bridgeManifest);
+
+    await expect(manager.getBridgeStatus(projectPath)).rejects.toMatchObject({ code: 'EISDIR' });
   });
 });
 
@@ -233,9 +252,7 @@ describe('ToolHandlers runtime bridge auto-ensure', () => {
   it('ensures the bridge before starting a controlled runtime session', async () => {
     const runtimeManager = {
       ensureBridge: vi.fn().mockResolvedValue({
-        installed: true,
         version: '0.1.4',
-        compatible: true,
         action: 'installed',
       }),
       startSession: vi.fn().mockResolvedValue({
@@ -255,7 +272,7 @@ describe('ToolHandlers runtime bridge auto-ensure', () => {
     expect(result.content[0].text).toContain(
       'Runtime control enabled; bridge installed (addons/godot_mcp_runtime/runtime_bridge.gd; project.godot [autoload]).'
     );
-    expect(runtimeManager.ensureBridge).toHaveBeenCalledWith(projectPath);
+    expect(runtimeManager.ensureBridge).toHaveBeenCalledWith(projectPath, { allowActiveSessionMutation: true });
     expect(runtimeManager.ensureBridge.mock.invocationCallOrder[0])
       .toBeLessThan(runtimeManager.startSession.mock.invocationCallOrder[0]);
   });
