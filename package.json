@@ -34,7 +34,7 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "prepare": "npm run build",
+    "prepare": "node scripts/apply-test-fixture-fix.mjs && npm run build",
     "smoke:packed": "node scripts/smoke-packed-cli.js build/index.js",
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
