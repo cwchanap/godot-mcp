@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { GODOT_SERVER_INFO } from './godot-server.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const pluginRoot = resolve(repoRoot, 'plugins/godot-plugin');
 
 function readJson<T>(relativePath: string): T {
   return JSON.parse(readFileSync(resolve(repoRoot, relativePath), 'utf8')) as T;
@@ -23,6 +24,7 @@ type PackageManifest = {
   publishConfig: { access: string };
   bin: Record<string, string>;
   files: string[];
+  scripts: Record<string, string>;
 };
 
 type PluginManifest = {
@@ -87,6 +89,7 @@ const mcpManifest = readJson<McpManifest>('plugins/godot-plugin/.mcp.json');
 const marketplaceManifest = readJson<MarketplaceManifest>(
   '.agents/plugins/marketplace.json'
 );
+const ciWorkflow = readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8');
 
 describe('Godot plugin package identity', () => {
   it('publishes the cwchanap package without changing the MCP protocol identity', () => {
@@ -111,12 +114,19 @@ describe('Godot plugin package identity', () => {
         'godot-plugin': 'build/index.js',
       },
       files: ['build'],
+      scripts: {
+        'smoke:packed': 'node scripts/smoke-packed-cli.js build/index.js',
+      },
     });
     expect(Object.keys(packageManifest.bin)).toEqual(['godot-plugin']);
     expect(GODOT_SERVER_INFO).toEqual({
       name: 'godot-mcp',
       version: packageManifest.version,
     });
+  });
+
+  it('runs the packed CLI smoke check in CI', () => {
+    expect(ciWorkflow).toContain('run: npm run smoke:packed');
   });
 });
 
@@ -152,6 +162,10 @@ describe('Codex plugin wrapper identity', () => {
     });
   });
 
+  it('resolves the declared MCP config from the plugin root', () => {
+    expect(existsSync(resolve(pluginRoot, pluginManifest.mcpServers))).toBe(true);
+  });
+
   it('pins the published package under the stable godot server key', () => {
     expect(mcpManifest).toEqual({
       mcpServers: {
@@ -164,7 +178,7 @@ describe('Codex plugin wrapper identity', () => {
     });
   });
 
-  it('publishes the plugin through the cwchanap repo marketplace', () => {
+  it('keeps the unpublished plugin gated in the cwchanap repo marketplace', () => {
     expect(marketplaceManifest).toEqual({
       name: 'cwchanap',
       interface: {
@@ -178,7 +192,7 @@ describe('Codex plugin wrapper identity', () => {
             path: './plugins/godot-plugin',
           },
           policy: {
-            installation: 'AVAILABLE',
+            installation: 'NOT_AVAILABLE',
             authentication: 'ON_INSTALL',
           },
           category: 'Developer Tools',
