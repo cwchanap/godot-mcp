@@ -21,6 +21,8 @@ async function replaceOnce(path, before, after) {
 
 runGit(['fetch', 'origin', branch]);
 runGit(['checkout', '-B', branch, `origin/${branch}`]);
+runGit(['config', 'user.name', 'cwchanap']);
+runGit(['config', 'user.email', '29033105+cwchanap@users.noreply.github.com']);
 
 let changed = false;
 
