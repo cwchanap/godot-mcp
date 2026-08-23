@@ -154,6 +154,11 @@ describe('RuntimeControlManager.ensureBridge', () => {
 
     expect(result.action).toBe('unchanged');
     await expect(readFile(bridgeScript, 'utf8')).resolves.toBe(crlfScript);
+    await expect(manager.getBridgeStatus(projectPath)).resolves.toEqual({
+      installed: true,
+      version: bridgeVersion,
+      compatible: true,
+    });
   });
 
   it('does not rewrite an already compatible bridge', async () => {
