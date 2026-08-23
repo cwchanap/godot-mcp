@@ -160,11 +160,26 @@ The server currently exposes 32 MCP tools.
 
 ## Quick Start
 
+Godot Agent Plugin uses one agent-neutral stdio MCP server for every supported client:
+
+```text
+npx -y @cwchanap/godot-plugin@0.1.4
+```
+
+The repository also ships Agent Plugins 1.0 metadata (`plugin.json` and `mcp.json`) and native wrapper metadata where a client has its own plugin format. Set `GODOT_PATH` in the agent's environment when automatic Godot discovery cannot find the executable.
+
+| Client | Integration | Status |
+| --- | --- | --- |
+| Codex | Native plugin marketplace + MCP | First-party |
+| Claude Code | Native plugin marketplace + MCP | First-party |
+| Cursor | Agent Plugins 1.0 + native MCP fallback | First-party metadata |
+| Devin | Custom stdio MCP | First-party configuration |
+| OpenCode | Local stdio MCP | First-party configuration |
+| Pi | Agent Plugins 1.0 or MCP through community extensions | Community-supported |
+
 ### Codex Plugin
 
 The Codex wrapper uses the published `@cwchanap/godot-plugin` version pinned in `plugins/godot-plugin/.mcp.json`.
-
-Add this repository as a marketplace and install the plugin:
 
 ```bash
 codex plugin marketplace add cwchanap/godot-mcp
@@ -173,24 +188,143 @@ codex plugin add godot-plugin@cwchanap
 
 Start a new Codex task after installation so the `mcp__godot__*` tools are loaded. If Godot is not discovered automatically, set `GODOT_PATH` in the environment that launches Codex and reopen the task.
 
-The npm-based client examples below use the published `@cwchanap/godot-plugin` package.
-
 ### Claude Code
 
+Start Claude Code:
+
 ```bash
-claude mcp add godot -- npx @cwchanap/godot-plugin
+claude
 ```
 
-Restart Claude Code after adding the server so the Godot MCP tools are loaded.
+Then add the marketplace and install the plugin inside the Claude Code session:
+
+```text
+/plugin marketplace add cwchanap/godot-mcp
+/plugin install godot-plugin@cwchanap
+```
+
+The Claude plugin reuses `plugins/godot-plugin/.mcp.json`; there is no Claude-specific MCP server implementation.
+
+For direct MCP configuration instead of the plugin wrapper:
+
+```bash
+claude mcp add --transport stdio godot -- npx -y @cwchanap/godot-plugin@0.1.4
+```
 
 With environment variables:
 
 ```bash
-claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx @cwchanap/godot-plugin
+claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx -y @cwchanap/godot-plugin@0.1.4
 ```
 
+### Cursor
+
+The repository root is an Agent Plugins 1.0 package. Cursor supports that format directly. Until the plugin is submitted to a Cursor marketplace, test a checkout locally by linking or copying it into Cursor's local plugin directory:
+
+```bash
+ln -s /path/to/godot-mcp ~/.cursor/plugins/local/godot-plugin
+```
+
+Restart Cursor or run **Developer: Reload Window**. Once published in a Cursor marketplace, installation uses Cursor's normal **Customize > Plugins** flow.
+
+For MCP-only setup, create `.cursor/mcp.json` in a project or `~/.cursor/mcp.json` globally:
+
+```json
+{
+  "mcpServers": {
+    "godot": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"]
+    }
+  }
+}
+```
+
+### Devin
+
+Create a custom MCP connection in Devin using:
+
+```text
+Transport: STDIO
+Command: npx
+Arguments: -y @cwchanap/godot-plugin@0.1.4
+```
+
+Add `GODOT_PATH` as an environment variable when needed.
+
+A hosted Devin session starts the stdio server in Devin's execution environment. It can control Godot installed and reachable there; this repository does not provide a relay back to a different local workstation.
+
+### OpenCode
+
+For the current stable OpenCode configuration, add a local MCP server to `opencode.json` or `opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "godot": {
+      "type": "local",
+      "command": ["npx", "-y", "@cwchanap/godot-plugin@0.1.4"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Verify the connection with:
+
+```bash
+opencode mcp list
+```
+
+OpenCode V2 currently uses `mcp.servers` and `disabled` instead of the stable `mcp.<name>` and `enabled` shape. Use its V2 documentation only when intentionally running that version.
+
+### Pi
+
+Pi MCP and Agent Plugins support are community-maintained rather than native Pi features.
+
+`pi-mcp-adapter` and `pi-agent-plugins` are community-maintained packages. Review those packages and this plugin's source before installing them or running `/plugin trust`; trusted plugins and MCP servers run with your user permissions.
+
+#### Portable Agent Plugin
+
+```bash
+pi install npm:pi-mcp-adapter
+pi install npm:pi-agent-plugins
+```
+
+Then, inside Pi, install this repository as an Agent Plugin:
+
+```text
+/plugin install https://github.com/cwchanap/godot-mcp.git
+/plugin trust godot-plugin
+```
+
+The loader discovers the root `plugin.json` and `mcp.json` and projects the MCP server through `pi-mcp-adapter`.
+
+#### MCP-only fallback
+
+```bash
+pi install npm:pi-mcp-adapter
+```
+
+Then create a project `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "godot": {
+      "command": "npx",
+      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"]
+    }
+  }
+}
+```
+
+### Cline
+
 <details>
-<summary><strong>Cline</strong></summary>
+<summary><strong>Cline MCP configuration</strong></summary>
 
 Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`):
 
@@ -245,42 +379,7 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
 
 </details>
 
-<details>
-<summary><strong>Cursor</strong></summary>
-
-**Using the Cursor UI:**
-
-1. Go to **Cursor Settings** > **Features** > **MCP**
-2. Click on the **+ Add New MCP Server** button
-3. Fill out the form:
-   - Name: `godot`
-   - Type: `command`
-   - Command: `npx @cwchanap/godot-plugin`
-4. Click "Add"
-5. You may need to press the refresh button in the top right corner of the MCP server card to populate the tool list
-
-**Using Project-Specific Configuration:**
-
-Create a file at `.cursor/mcp.json` in your project directory:
-
-```json
-{
-  "mcpServers": {
-    "godot": {
-      "command": "npx",
-      "args": ["@cwchanap/godot-plugin"],
-      "env": {
-        "DEBUG": "true"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Other MCP Clients</strong></summary>
+### Other MCP Clients
 
 For any MCP-compatible client, use this configuration:
 
@@ -289,7 +388,7 @@ For any MCP-compatible client, use this configuration:
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["@cwchanap/godot-plugin"],
+      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"],
       "env": {
         "GODOT_PATH": "/path/to/godot",
         "DEBUG": "true"
@@ -299,7 +398,17 @@ For any MCP-compatible client, use this configuration:
 }
 ```
 
-</details>
+### Distribution Model
+
+The integration intentionally stays small:
+
+- one npm MCP runtime;
+- one portable Agent Plugins 1.0 definition;
+- thin Codex and Claude Code wrappers;
+- direct MCP configuration for Devin and OpenCode;
+- community adapters for Pi.
+
+There is no per-client server fork, hosted HTTP transport, or workstation relay in this integration.
 
 ### Environment Variables
 
