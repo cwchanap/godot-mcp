@@ -197,6 +197,15 @@ describe('RuntimeControlManager.ensureBridge', () => {
       'Generated runtime bridge script is missing:'
     );
   });
+
+  it('validates managed assets before installing into a clean project', async () => {
+    await rm(path.join(assetsPath, 'runtime_bridge.gd'));
+    const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: assetsPath });
+
+    await expect(manager.ensureBridge(projectPath)).rejects.toThrow(
+      'Generated runtime bridge script is missing:'
+    );
+  });
 });
 
 describe('ToolHandlers runtime bridge auto-ensure', () => {
