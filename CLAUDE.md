@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 - **Build**: `npm run build` - Compiles TypeScript and copies GDScript files to build directory
-- **Run (packaged, after publication)**: `npx @cwchanap/godot-plugin` - Executes the published CLI without cloning the repo; unavailable until the package is published
+- **Run (packaged)**: `npx @cwchanap/godot-plugin` - Executes the published CLI without cloning the repo
 - **Watch**: `npm run watch` - Continuously rebuilds on file changes during development
 - **MCP Inspector**: `npm run inspector` - Interactive debugging tool for MCP server testing
 - **Prepare**: `npm run prepare` - Runs build as part of npm lifecycle (auto-runs on install)

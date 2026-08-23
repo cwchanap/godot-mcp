@@ -95,11 +95,11 @@ Godot MCP enables AI agents to launch the Godot editor, run projects, capture de
 
 ## Quick Start
 
-### Codex Plugin (pending publication)
+### Codex Plugin
 
-The Codex wrapper uses the exact `@cwchanap/godot-plugin` version pinned in `plugins/godot-plugin/.mcp.json`. Its `npx` launch path and marketplace installation are unavailable until that package is published to npm and the marketplace entry is enabled.
+The Codex wrapper uses the published `@cwchanap/godot-plugin` version pinned in `plugins/godot-plugin/.mcp.json`.
 
-After publication, add this repository as a marketplace and install the plugin:
+Add this repository as a marketplace and install the plugin:
 
 ```bash
 codex plugin marketplace add cwchanap/godot-agent-plugin
@@ -108,7 +108,7 @@ codex plugin add godot-plugin@cwchanap
 
 Start a new Codex task after installation so the `mcp__godot__*` tools are loaded. If Godot is not discovered automatically, set `GODOT_PATH` in the environment that launches Codex and reopen the task.
 
-The npm-based client examples below also require `@cwchanap/godot-plugin` to be published. Until then, use **Building from Source** below; it is the working installation path for this fork.
+The npm-based client examples below use the published `@cwchanap/godot-plugin` package.
 
 ### Claude Code
 

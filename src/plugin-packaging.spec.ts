@@ -178,7 +178,7 @@ describe('Codex plugin wrapper identity', () => {
     });
   });
 
-  it('keeps the unpublished plugin gated in the cwchanap repo marketplace', () => {
+  it('makes the published plugin installable from the cwchanap repo marketplace', () => {
     expect(marketplaceManifest).toEqual({
       name: 'cwchanap',
       interface: {
@@ -192,7 +192,7 @@ describe('Codex plugin wrapper identity', () => {
             path: './plugins/godot-plugin',
           },
           policy: {
-            installation: 'NOT_AVAILABLE',
+            installation: 'AVAILABLE',
             authentication: 'ON_INSTALL',
           },
           category: 'Developer Tools',
