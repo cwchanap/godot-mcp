@@ -348,10 +348,6 @@ export class ToolHandlers {
 
       this.activeProcess = { process, output, errors };
 
-      const runtimeMessage = shouldStartRuntimeControl
-        ? ` Runtime control enabled; bridge ${bridgeEnsureAction}.`
-        : '';
-
       return {
         content: [
           {

@@ -34,7 +34,7 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "prepare": "node scripts/remove-stale-runtime-message.mjs && npm run build",
+    "prepare": "npm run build",
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build"
