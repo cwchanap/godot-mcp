@@ -117,7 +117,10 @@ export interface RuntimeControlSessionManager {
 
 export type RuntimeBridgeEnsureAction = 'installed' | 'updated' | 'unchanged';
 
-export interface RuntimeBridgeEnsureResult extends RuntimeBridgeStatus {
+export interface RuntimeBridgeEnsureResult {
+  installed: true;
+  version: string;
+  compatible: true;
   action: RuntimeBridgeEnsureAction;
 }
 

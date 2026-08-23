@@ -251,13 +251,26 @@ export class ToolHandlers {
       }
 
       const shouldStartRuntimeControl = args.runtimeControl === true;
-      let bridgeEnsureAction: 'installed' | 'updated' | 'unchanged' | null = null;
+      let runtimeMessage = '';
 
       // Prepare the bridge BEFORE killing the existing process so a failed
       // install/update does not leave the user without a running game.
       if (shouldStartRuntimeControl) {
-        const bridgeResult = await this.runtimeControlManager.ensureBridge(args.projectPath);
-        bridgeEnsureAction = bridgeResult.action;
+        try {
+          const bridgeResult = await this.runtimeControlManager.ensureBridge(args.projectPath);
+          runtimeMessage = bridgeResult.action === 'unchanged'
+            ? ' Runtime control enabled; bridge unchanged.'
+            : ` Runtime control enabled; bridge ${bridgeResult.action} (addons/godot_mcp_runtime/runtime_bridge.gd; project.godot [autoload]).`;
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          return this.createErrorResponse(
+            `Failed to prepare runtime bridge: ${errorMessage}`,
+            [
+              'Ensure the project directory and project.godot are writable',
+              'Use ensure_runtime_bridge to repair or inspect the managed bridge before launching with runtime control',
+            ]
+          );
+        }
       }
 
       // Kill any existing process — clear activeProcess synchronously before any

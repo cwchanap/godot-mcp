@@ -226,7 +226,7 @@ Expected errors include:
   - use the existing start/reconnect guidance
 
 - **bridge version mismatch**
-  - instruct the user to run `update_runtime_bridge`
+  - rerun with runtime control so the managed bridge is auto-repaired, or call `ensure_runtime_bridge` directly
 
 - **capture already in progress**
   - tell the caller to retry after the active capture completes
@@ -256,7 +256,7 @@ All capture failures that produce no valid image use the existing MCP error-resp
 
 ## Compatibility and Versioning
 
-The bridge protocol gains a command that older installed addons do not support. The package receives a patch-version bump, and the generated bridge manifest carries that version. Existing bridge compatibility checks therefore direct users with an older installed addon to `update_runtime_bridge` before runtime control starts.
+The bridge protocol gains a command that older installed addons do not support. The package receives a patch-version bump, and the generated bridge manifest carries that version. Controlled launches reconcile the managed addon before runtime control starts; `ensure_runtime_bridge` provides the same repair path explicitly.
 
 All existing tool names, inputs, responses, and runtime commands remain unchanged.
 
