@@ -331,18 +331,28 @@ export class RuntimeControlManager {
 
   async ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult> {
     const currentStatus = await this.getBridgeStatus(projectPath);
-    if (currentStatus.installed && currentStatus.compatible) {
-      return { ...currentStatus, action: 'unchanged' };
+    if (currentStatus.installed && currentStatus.compatible && currentStatus.version) {
+      return {
+        installed: true,
+        version: currentStatus.version,
+        compatible: true,
+        action: 'unchanged',
+      };
     }
 
     const action = currentStatus.installed ? 'updated' : 'installed';
     const status = await this.writeBridge(projectPath);
 
-    if (!status.installed || !status.compatible) {
+    if (!status.installed || !status.compatible || !status.version) {
       throw new Error('Runtime bridge preparation did not produce a compatible managed bridge.');
     }
 
-    return { ...status, action };
+    return {
+      installed: true,
+      version: status.version,
+      compatible: true,
+      action,
+    };
   }
 
   async getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus> {
@@ -380,14 +390,15 @@ export class RuntimeControlManager {
 
     const [installedScript, managedScript] = await Promise.all([
       readFile(scriptPath, 'utf8'),
-      readFile(this.runtimeBridgeScriptPath, 'utf8'),
+      this.readManagedBridgeScript(),
     ]);
 
     return {
       installed: true,
       version,
       compatible:
-        version === this.getGeneratedBridgeVersion() && installedScript === managedScript,
+        version === this.getGeneratedBridgeVersion() &&
+        this.normalizeBridgeScript(installedScript) === this.normalizeBridgeScript(managedScript),
     };
   }
 
@@ -622,6 +633,26 @@ export class RuntimeControlManager {
       }
       return false;
     }
+  }
+
+  private async readManagedBridgeScript(): Promise<string> {
+    try {
+      return await readFile(this.runtimeBridgeScriptPath, 'utf8');
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        throw new Error(`Generated runtime bridge script is missing: ${this.runtimeBridgeScriptPath}`);
+      }
+      throw error;
+    }
+  }
+
+  private normalizeBridgeScript(content: string): string {
+    return content.replace(/\r\n?/g, '\n');
   }
 
   private async pathExists(targetPath: string): Promise<boolean> {
