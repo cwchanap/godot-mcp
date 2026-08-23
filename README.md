@@ -1,17 +1,17 @@
-# Godot MCP
-
-[![Github-sponsors](https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=#EA4AAA)](https://github.com/sponsors/Coding-Solo)
+# Godot Agent Plugin
 
 [![](https://badge.mcpx.dev?type=server 'MCP Server')](https://modelcontextprotocol.io/introduction)
 [![Made with Godot](https://img.shields.io/badge/Made%20with-Godot-478CBF?style=flat&logo=godot%20engine&logoColor=white)](https://godotengine.org)
 [![](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white 'Node.js')](https://nodejs.org/en/download/)
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 
-[![](https://img.shields.io/github/last-commit/Coding-Solo/godot-mcp 'Last Commit')](https://github.com/Coding-Solo/godot-mcp/commits/main)
-[![](https://img.shields.io/github/stars/Coding-Solo/godot-mcp 'Stars')](https://github.com/Coding-Solo/godot-mcp/stargazers)
-[![](https://img.shields.io/github/forks/Coding-Solo/godot-mcp 'Forks')](https://github.com/Coding-Solo/godot-mcp/network/members)
+[![](https://img.shields.io/github/last-commit/cwchanap/godot-agent-plugin 'Last Commit')](https://github.com/cwchanap/godot-agent-plugin/commits/main)
+[![](https://img.shields.io/github/stars/cwchanap/godot-agent-plugin 'Stars')](https://github.com/cwchanap/godot-agent-plugin/stargazers)
+[![](https://img.shields.io/github/forks/cwchanap/godot-agent-plugin 'Forks')](https://github.com/cwchanap/godot-agent-plugin/network/members)
+[![](https://img.shields.io/npm/v/%40cwchanap%2Fgodot-plugin 'npm')](https://www.npmjs.com/package/@cwchanap/godot-plugin)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
+This repository is maintained by `cwchanap` as a fork of [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp), originally created by Solomon Elias. This fork is distributed as the Codex plugin `godot-plugin` and the npm package [`@cwchanap/godot-plugin`](https://www.npmjs.com/package/@cwchanap/godot-plugin), with the original MIT license and attribution preserved.
 
 ```text
                            (((((((             (((((((
@@ -53,11 +53,11 @@
                          |__/     |__/ \______/ |__/
 ```
 
-A Model Context Protocol (MCP) server for interacting with the Godot game engine.
+A Codex plugin and Model Context Protocol (MCP) server for interacting with the Godot game engine.
 
 ## Introduction
 
-Godot MCP enables AI agents to launch the Godot editor, run projects, capture debug output, and control project execution. This direct feedback loop helps agents understand what works and what doesn't in real Godot projects, leading to better code generation and debugging assistance.
+Godot Agent Plugin packages the Godot MCP server for Codex and other MCP-compatible agents. It can launch the Godot editor, run projects, capture debug output, author project resources, and control a running game through a managed runtime bridge. This direct feedback loop helps agents understand what works and what doesn't in real Godot projects, leading to better code generation and debugging assistance.
 
 ## Features
 
@@ -86,6 +86,71 @@ Godot MCP enables AI agents to launch the Godot editor, run projects, capture de
 - **UID Management** (for Godot 4.4+):
   - Get UID for specific files
   - Update UID references by resaving resources
+- **TileMap and TileSet Authoring**:
+  - Create TileMap nodes and TileSet resources
+  - Add atlas texture sources and assign TileSets
+  - Paint and inspect TileMap and TileMapLayer cells
+
+## Available Tools
+
+The server currently exposes 32 MCP tools.
+
+### Project and Process
+
+| Tool | Purpose |
+|------|---------|
+| `launch_editor` | Launch the Godot editor for a project |
+| `run_project` | Run a project and capture its output |
+| `get_debug_output` | Read current debug output and errors |
+| `stop_project` | Stop the currently running project |
+| `get_godot_version` | Report the installed Godot version |
+| `list_projects` | Find Godot projects under a directory |
+| `get_project_info` | Retrieve metadata about a Godot project |
+
+### Runtime Bridge and Live Game Control
+
+| Tool | Purpose |
+|------|---------|
+| `ensure_runtime_bridge` | Install, repair, or update the managed runtime bridge |
+| `get_runtime_bridge_status` | Inspect the bridge installed in a project |
+| `uninstall_runtime_bridge` | Remove the managed runtime bridge |
+| `get_runtime_state` | Inspect the active runtime bridge session |
+| `find_node` | Find a node in the running scene tree |
+| `change_scene` | Request a scene transition in the running project |
+| `invoke_node_action` | Invoke an allowlisted action on a live node |
+| `capture_screenshot` | Capture the latest rendered game frame |
+
+### Scene and Asset Authoring
+
+| Tool | Purpose |
+|------|---------|
+| `create_scene` | Create a Godot scene file |
+| `add_node` | Add a node to an existing scene |
+| `load_sprite` | Load a texture into a Sprite2D node |
+| `export_mesh_library` | Export a scene as a MeshLibrary resource |
+| `save_scene` | Save changes to a scene file |
+| `reimport_asset` | Re-import assets through Godot's importer pipeline |
+
+### UID Management
+
+| Tool | Purpose |
+|------|---------|
+| `get_uid` | Get a file UID in Godot 4.4+ |
+| `update_project_uids` | Update UID references by resaving project resources |
+
+### TileMap and TileSet Authoring
+
+| Tool | Purpose |
+|------|---------|
+| `create_tilemap` | Create a TileMap node in a scene |
+| `create_tileset` | Create a TileSet resource |
+| `set_tilemap_source` | Assign a TileSet resource to a TileMap |
+| `paint_tiles` | Paint cells on a TileMap |
+| `paint_tiles_to_layer` | Paint cells on a TileMapLayer |
+| `add_tileset_source` | Add a texture source to a TileSet |
+| `read_tilemap` | Read TileMap data and tile usage |
+| `read_tilemap_layer_used_cells` | Read used TileMapLayer cells with tile details |
+| `read_tileset` | Read TileSet sources and atlas metadata |
 
 ## Requirements
 
@@ -116,7 +181,7 @@ The npm-based client examples below use the published `@cwchanap/godot-plugin` p
 claude mcp add godot -- npx @cwchanap/godot-plugin
 ```
 
-After the npm package is published, restart Claude Code and your Godot MCP tools are available.
+Restart Claude Code after adding the server so the Godot MCP tools are loaded.
 
 With environment variables:
 
@@ -327,7 +392,7 @@ The bundled script accepts operation type and parameters as JSON, allowing for f
 
 ## Attribution
 
-This fork is maintained by `cwchanap`. It is based on [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp) by Solomon Elias and remains available under the MIT License.
+This repository is a maintained fork of [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp), originally created by Solomon Elias. The fork is maintained and published by `cwchanap` as `godot-plugin` for Codex and `@cwchanap/godot-plugin` on npm. The original copyright notice and MIT license are preserved in [LICENSE](LICENSE).
 
 ## License
 
