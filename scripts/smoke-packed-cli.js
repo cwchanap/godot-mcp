@@ -1,4 +1,4 @@
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -11,6 +11,9 @@ if (!binaryArgument) {
   process.exit(2);
 }
 
+const packageManifest = JSON.parse(
+  await readFile(new URL('../package.json', import.meta.url), 'utf8')
+);
 const binaryPath = resolve(binaryArgument);
 await access(binaryPath);
 
@@ -32,7 +35,7 @@ try {
   await client.connect(transport);
 
   const serverVersion = client.getServerVersion();
-  if (serverVersion?.name !== 'godot-mcp' || serverVersion.version !== '0.1.4') {
+  if (serverVersion?.name !== 'godot-mcp' || serverVersion.version !== packageManifest.version) {
     throw new Error(`Unexpected MCP server metadata: ${JSON.stringify(serverVersion)}`);
   }
 
