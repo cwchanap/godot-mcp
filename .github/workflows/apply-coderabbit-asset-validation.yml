@@ -1,0 +1,36 @@
+name: Apply CodeRabbit asset validation fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'feat/runtime-bridge-auto-ensure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/runtime-bridge-auto-ensure
+      - name: Apply targeted fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/runtime-control-manager.ts')
+          text = path.read_text()
+          before = "  async ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult> {\n    const currentStatus = await this.getBridgeStatus(projectPath);"
+          after = "  async ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult> {\n    this.getGeneratedBridgeVersion();\n    const currentStatus = await this.getBridgeStatus(projectPath);"
+          if before not in text:
+              raise SystemExit('expected ensureBridge sequence not found')
+          path.write_text(text.replace(before, after, 1))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-coderabbit-asset-validation.yml
+          git add src/runtime-control-manager.ts
+          git commit -m "fix: validate runtime bridge assets before preparation"
+          git push origin HEAD:feat/runtime-bridge-auto-ensure
