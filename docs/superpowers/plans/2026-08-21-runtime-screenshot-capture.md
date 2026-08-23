@@ -1087,7 +1087,7 @@ or:
 { "saveTo": "project" }
 ```
 
-for persistence. State that the image is always returned, temporary files are removed on normal shutdown, project files live under `.godot-mcp/captures/`, the PNG cap is 16 MiB, headless sessions cannot capture, and an older installed bridge requires `update_runtime_bridge`. Add `capture_screenshot` to the Cline `autoApprove` array.
+for persistence. State that the image is always returned, temporary files are removed on normal shutdown, project files live under `.godot-mcp/captures/`, the PNG cap is 16 MiB, headless sessions cannot capture, and controlled launches automatically reconcile an older installed bridge before capture. Add `capture_screenshot` to the Cline `autoApprove` array.
 
 - [ ] **Step 5: Correct CONTRIBUTING's stale tool entry**
 

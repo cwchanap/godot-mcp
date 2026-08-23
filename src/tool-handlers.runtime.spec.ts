@@ -116,7 +116,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
+      ensureBridge: vi.fn().mockResolvedValue({ version: '1.0.0', action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -140,7 +140,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockResolvedValue(undefined),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
+      ensureBridge: vi.fn().mockResolvedValue({ version: '1.0.0', action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -268,7 +268,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockRejectedValue(new Error('bridge teardown failed')),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
+      ensureBridge: vi.fn().mockResolvedValue({ version: '1.0.0', action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -328,7 +328,7 @@ describe('ToolHandlers runtime launch plumbing', () => {
       }),
       stopSession: vi.fn().mockRejectedValue(new Error('stopSession boom')),
       cleanup: vi.fn().mockResolvedValue(undefined),
-      ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' }),
+      ensureBridge: vi.fn().mockResolvedValue({ version: '1.0.0', action: 'unchanged' }),
     };
     const handlers = new (ToolHandlers as unknown as new (...args: any[]) => ToolHandlers)(
       { getPath: () => '/Applications/Godot.app/Contents/MacOS/Godot' },
@@ -389,7 +389,7 @@ describe('GodotServer runtime bridge management tools', () => {
   it('delegates consolidated runtime bridge management tool calls to tool handlers', async () => {
     const server = new GodotServer();
     const originalToolHandlers = (server as any).toolHandlers;
-    const ensureResponse = { content: [{ type: 'text' as const, text: '{"installed":true,"compatible":true,"action":"unchanged"}' }] };
+    const ensureResponse = { content: [{ type: 'text' as const, text: '{"version":"1.0.0","action":"unchanged"}' }] };
     const statusResponse = { content: [{ type: 'text' as const, text: '{"installed":true,"compatible":true}' }] };
     const uninstallResponse = { content: [{ type: 'text' as const, text: '{"message":"removed"}' }] };
     const handleEnsureRuntimeBridge = vi.fn().mockResolvedValue(ensureResponse);

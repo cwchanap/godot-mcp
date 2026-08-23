@@ -117,15 +117,17 @@ export interface RuntimeControlSessionManager {
 
 export type RuntimeBridgeEnsureAction = 'installed' | 'updated' | 'unchanged';
 
+export interface RuntimeBridgeEnsureOptions {
+  allowActiveSessionMutation?: boolean;
+}
+
 export interface RuntimeBridgeEnsureResult {
-  installed: true;
   version: string;
-  compatible: true;
   action: RuntimeBridgeEnsureAction;
 }
 
 export interface RuntimeBridgeManager extends RuntimeControlSessionManager {
-  ensureBridge(projectPath: string): Promise<RuntimeBridgeEnsureResult>;
+  ensureBridge(projectPath: string, options?: RuntimeBridgeEnsureOptions): Promise<RuntimeBridgeEnsureResult>;
   getBridgeStatus(projectPath: string): Promise<RuntimeBridgeStatus>;
   uninstallBridge(projectPath: string): Promise<void>;
 }
