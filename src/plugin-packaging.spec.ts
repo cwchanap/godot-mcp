@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { GODOT_SERVER_INFO } from './godot-server.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const pluginRoot = resolve(repoRoot, 'plugins/godot-plugin');
 
 function readJson<T>(relativePath: string): T {
   return JSON.parse(readFileSync(resolve(repoRoot, relativePath), 'utf8')) as T;
@@ -23,6 +24,7 @@ type PackageManifest = {
   publishConfig: { access: string };
   bin: Record<string, string>;
   files: string[];
+  scripts: Record<string, string>;
 };
 
 type PluginManifest = {
@@ -87,6 +89,7 @@ const mcpManifest = readJson<McpManifest>('plugins/godot-plugin/.mcp.json');
 const marketplaceManifest = readJson<MarketplaceManifest>(
   '.agents/plugins/marketplace.json'
 );
+const ciWorkflow = readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8');
 
 describe('Godot plugin package identity', () => {
   it('publishes the cwchanap package without changing the MCP protocol identity', () => {
@@ -96,27 +99,34 @@ describe('Godot plugin package identity', () => {
       description: 'MCP server for interfacing with Godot game engine. Provides tools for launching the editor, running projects, and capturing debug output.',
       keywords: ['godot', 'mcp', 'ai', 'claude', 'cline'],
       author: 'cwchanap',
-      homepage: 'https://github.com/cwchanap/godot-mcp',
+      homepage: 'https://github.com/cwchanap/godot-agent-plugin',
       bugs: {
-        url: 'https://github.com/cwchanap/godot-mcp/issues',
+        url: 'https://github.com/cwchanap/godot-agent-plugin/issues',
       },
       repository: {
         type: 'git',
-        url: 'https://github.com/cwchanap/godot-mcp.git',
+        url: 'git+https://github.com/cwchanap/godot-agent-plugin.git',
       },
       publishConfig: {
         access: 'public',
       },
       bin: {
-        'godot-plugin': './build/index.js',
+        'godot-plugin': 'build/index.js',
       },
       files: ['build'],
+      scripts: {
+        'smoke:packed': 'node scripts/smoke-packed-cli.js build/index.js',
+      },
     });
     expect(Object.keys(packageManifest.bin)).toEqual(['godot-plugin']);
     expect(GODOT_SERVER_INFO).toEqual({
       name: 'godot-mcp',
       version: packageManifest.version,
     });
+  });
+
+  it('runs the packed CLI smoke check in CI', () => {
+    expect(ciWorkflow).toContain('run: npm run smoke:packed');
   });
 });
 
@@ -130,8 +140,8 @@ describe('Codex plugin wrapper identity', () => {
         name: 'cwchanap',
         url: 'https://github.com/cwchanap',
       },
-      homepage: 'https://github.com/cwchanap/godot-mcp',
-      repository: 'https://github.com/cwchanap/godot-mcp',
+      homepage: 'https://github.com/cwchanap/godot-agent-plugin',
+      repository: 'https://github.com/cwchanap/godot-agent-plugin',
       license: 'MIT',
       keywords: ['godot', 'mcp', 'codex', 'game-development'],
       mcpServers: './.mcp.json',
@@ -142,7 +152,7 @@ describe('Codex plugin wrapper identity', () => {
         developerName: 'cwchanap',
         category: 'Developer Tools',
         capabilities: ['Read', 'Write'],
-        websiteURL: 'https://github.com/cwchanap/godot-mcp',
+        websiteURL: 'https://github.com/cwchanap/godot-agent-plugin',
         defaultPrompt: [
           'Inspect this Godot project and summarize its structure.',
           'Run this Godot project and diagnose any errors.',
@@ -150,6 +160,10 @@ describe('Codex plugin wrapper identity', () => {
         ],
       },
     });
+  });
+
+  it('resolves the declared MCP config from the plugin root', () => {
+    expect(existsSync(resolve(pluginRoot, pluginManifest.mcpServers))).toBe(true);
   });
 
   it('pins the published package under the stable godot server key', () => {
@@ -164,7 +178,7 @@ describe('Codex plugin wrapper identity', () => {
     });
   });
 
-  it('publishes the plugin through the cwchanap repo marketplace', () => {
+  it('keeps the unpublished plugin gated in the cwchanap repo marketplace', () => {
     expect(marketplaceManifest).toEqual({
       name: 'cwchanap',
       interface: {
@@ -178,7 +192,7 @@ describe('Codex plugin wrapper identity', () => {
             path: './plugins/godot-plugin',
           },
           policy: {
-            installation: 'AVAILABLE',
+            installation: 'NOT_AVAILABLE',
             authentication: 'ON_INSTALL',
           },
           category: 'Developer Tools',
