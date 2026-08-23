@@ -1079,7 +1079,7 @@ describe('RuntimeControlManager', () => {
     const manager = new RuntimeControlManager({ runtimeBridgeAssetsDir: generatedAssetsPath });
     const result = await manager.ensureBridge(projectPath);
 
-    expect(result).toEqual({ version: generatedVersion, action: 'updated' });
+    expect(result).toEqual({ version: generatedVersion, action: 'installed' });
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.toContain(generatedVersion);
     await expect(readFile(path.join(bridgeDir, 'runtime_bridge.gd'), 'utf8')).resolves.not.toContain(staleVersion);
   });
