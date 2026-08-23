@@ -5,9 +5,9 @@
 [![](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white 'Node.js')](https://nodejs.org/en/download/)
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 
-[![](https://img.shields.io/github/last-commit/cwchanap/godot-agent-plugin 'Last Commit')](https://github.com/cwchanap/godot-agent-plugin/commits/main)
-[![](https://img.shields.io/github/stars/cwchanap/godot-agent-plugin 'Stars')](https://github.com/cwchanap/godot-agent-plugin/stargazers)
-[![](https://img.shields.io/github/forks/cwchanap/godot-agent-plugin 'Forks')](https://github.com/cwchanap/godot-agent-plugin/network/members)
+[![](https://img.shields.io/github/last-commit/cwchanap/godot-mcp 'Last Commit')](https://github.com/cwchanap/godot-mcp/commits/main)
+[![](https://img.shields.io/github/stars/cwchanap/godot-mcp 'Stars')](https://github.com/cwchanap/godot-mcp/stargazers)
+[![](https://img.shields.io/github/forks/cwchanap/godot-mcp 'Forks')](https://github.com/cwchanap/godot-mcp/network/members)
 [![](https://img.shields.io/npm/v/%40cwchanap%2Fgodot-plugin 'npm')](https://www.npmjs.com/package/@cwchanap/godot-plugin)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
@@ -167,7 +167,7 @@ The Codex wrapper uses the published `@cwchanap/godot-plugin` version pinned in 
 Add this repository as a marketplace and install the plugin:
 
 ```bash
-codex plugin marketplace add cwchanap/godot-agent-plugin
+codex plugin marketplace add cwchanap/godot-mcp
 codex plugin add godot-plugin@cwchanap
 ```
 
@@ -312,8 +312,8 @@ For any MCP-compatible client, use this configuration:
 <summary><strong>Building from Source</strong></summary>
 
 ```bash
-git clone https://github.com/cwchanap/godot-agent-plugin.git
-cd godot-agent-plugin
+git clone https://github.com/cwchanap/godot-mcp.git
+cd godot-mcp
 npm install
 npm run build
 ```

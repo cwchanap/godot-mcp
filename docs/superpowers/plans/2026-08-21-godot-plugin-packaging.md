@@ -105,13 +105,13 @@ describe('Godot plugin package identity', () => {
       description: 'MCP server for interfacing with Godot game engine. Provides tools for launching the editor, running projects, and capturing debug output.',
       keywords: ['godot', 'mcp', 'ai', 'claude', 'cline'],
       author: 'cwchanap',
-      homepage: 'https://github.com/cwchanap/godot-agent-plugin',
+      homepage: 'https://github.com/cwchanap/godot-mcp',
       bugs: {
-        url: 'https://github.com/cwchanap/godot-agent-plugin/issues',
+        url: 'https://github.com/cwchanap/godot-mcp/issues',
       },
       repository: {
         type: 'git',
-        url: 'git+https://github.com/cwchanap/godot-agent-plugin.git',
+        url: 'git+https://github.com/cwchanap/godot-mcp.git',
       },
       publishConfig: {
         access: 'public',
@@ -174,13 +174,13 @@ Set these exact fields in `package.json`, preserving all unshown fields and depe
 {
   "name": "@cwchanap/godot-plugin",
   "version": "0.1.4",
-  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
+  "homepage": "https://github.com/cwchanap/godot-mcp",
   "bugs": {
-    "url": "https://github.com/cwchanap/godot-agent-plugin/issues"
+    "url": "https://github.com/cwchanap/godot-mcp/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cwchanap/godot-agent-plugin.git"
+    "url": "git+https://github.com/cwchanap/godot-mcp.git"
   },
   "license": "MIT",
   "author": "cwchanap",
@@ -311,8 +311,8 @@ describe('Codex plugin wrapper identity', () => {
         name: 'cwchanap',
         url: 'https://github.com/cwchanap',
       },
-      homepage: 'https://github.com/cwchanap/godot-agent-plugin',
-      repository: 'https://github.com/cwchanap/godot-agent-plugin',
+      homepage: 'https://github.com/cwchanap/godot-mcp',
+      repository: 'https://github.com/cwchanap/godot-mcp',
       license: 'MIT',
       keywords: ['godot', 'mcp', 'codex', 'game-development'],
       mcpServers: './.mcp.json',
@@ -323,7 +323,7 @@ describe('Codex plugin wrapper identity', () => {
         developerName: 'cwchanap',
         category: 'Developer Tools',
         capabilities: ['Read', 'Write'],
-        websiteURL: 'https://github.com/cwchanap/godot-agent-plugin',
+        websiteURL: 'https://github.com/cwchanap/godot-mcp',
         defaultPrompt: [
           'Inspect this Godot project and summarize its structure.',
           'Run this Godot project and diagnose any errors.',
@@ -396,8 +396,8 @@ Create `plugins/godot-plugin/.codex-plugin/plugin.json`:
     "name": "cwchanap",
     "url": "https://github.com/cwchanap"
   },
-  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
-  "repository": "https://github.com/cwchanap/godot-agent-plugin",
+  "homepage": "https://github.com/cwchanap/godot-mcp",
+  "repository": "https://github.com/cwchanap/godot-mcp",
   "license": "MIT",
   "keywords": ["godot", "mcp", "codex", "game-development"],
   "mcpServers": "./.mcp.json",
@@ -408,7 +408,7 @@ Create `plugins/godot-plugin/.codex-plugin/plugin.json`:
     "developerName": "cwchanap",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
-    "websiteURL": "https://github.com/cwchanap/godot-agent-plugin",
+    "websiteURL": "https://github.com/cwchanap/godot-mcp",
     "defaultPrompt": [
       "Inspect this Godot project and summarize its structure.",
       "Run this Godot project and diagnose any errors.",
@@ -512,7 +512,7 @@ The Codex wrapper uses `@cwchanap/godot-plugin@0.1.4`. Its `npx` launch path is 
 After publication, add this repository as a marketplace and install the plugin:
 
 ```bash
-codex plugin marketplace add cwchanap/godot-agent-plugin
+codex plugin marketplace add cwchanap/godot-mcp
 codex plugin add godot-plugin@cwchanap
 ```
 
@@ -772,7 +772,7 @@ Do not run `npm publish`. Report the validated tarball path, the exact package/v
 
 Execute this checklist only after the user separately approves and completes npm publication:
 
-1. Run `rtk codex plugin marketplace add cwchanap/godot-agent-plugin`.
+1. Run `rtk codex plugin marketplace add cwchanap/godot-mcp`.
 2. Run `rtk codex plugin add godot-plugin@cwchanap`.
 3. Start a new Codex task so plugin tools are loaded.
 4. Call `get_godot_version` and confirm the installed Godot version is returned.

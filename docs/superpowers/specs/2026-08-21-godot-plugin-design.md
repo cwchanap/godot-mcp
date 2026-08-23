@@ -6,7 +6,7 @@
 
 The repository builds a local stdio MCP server from `build/index.js` and currently publishes under the inherited `@coding-solo/godot-mcp` identity. The new distribution must be owned by `cwchanap`, installable by Codex as a plugin, and independent of the upstream creator's npm namespace.
 
-The GitHub repository is `cwchanap/godot-agent-plugin`; the local checkout remains named `godot-mcp`.
+The GitHub repository is `cwchanap/godot-mcp`; the local checkout remains named `godot-mcp`.
 
 ## Goals
 
@@ -53,9 +53,9 @@ The publishable `package.json` identity is:
 | `name` | `@cwchanap/godot-plugin` |
 | `version` | `0.1.4` |
 | `author` | `cwchanap` |
-| `homepage` | `https://github.com/cwchanap/godot-agent-plugin` |
-| `bugs.url` | `https://github.com/cwchanap/godot-agent-plugin/issues` |
-| `repository.url` | `git+https://github.com/cwchanap/godot-agent-plugin.git` |
+| `homepage` | `https://github.com/cwchanap/godot-mcp` |
+| `bugs.url` | `https://github.com/cwchanap/godot-mcp/issues` |
+| `repository.url` | `git+https://github.com/cwchanap/godot-mcp.git` |
 | `publishConfig.access` | `public` |
 | executable | `godot-plugin` -> `build/index.js` |
 | published files | `build/` only |
@@ -85,8 +85,8 @@ The complete plugin manifest is:
     "name": "cwchanap",
     "url": "https://github.com/cwchanap"
   },
-  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
-  "repository": "https://github.com/cwchanap/godot-agent-plugin",
+  "homepage": "https://github.com/cwchanap/godot-mcp",
+  "repository": "https://github.com/cwchanap/godot-mcp",
   "license": "MIT",
   "keywords": ["godot", "mcp", "codex", "game-development"],
   "mcpServers": "./.mcp.json",
@@ -97,7 +97,7 @@ The complete plugin manifest is:
     "developerName": "cwchanap",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write"],
-    "websiteURL": "https://github.com/cwchanap/godot-agent-plugin",
+    "websiteURL": "https://github.com/cwchanap/godot-mcp",
     "defaultPrompt": [
       "Inspect this Godot project and summarize its structure.",
       "Run this Godot project and diagnose any errors.",

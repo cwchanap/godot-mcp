@@ -9,13 +9,13 @@
     "claude",
     "cline"
   ],
-  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
+  "homepage": "https://github.com/cwchanap/godot-mcp",
   "bugs": {
-    "url": "https://github.com/cwchanap/godot-agent-plugin/issues"
+    "url": "https://github.com/cwchanap/godot-mcp/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cwchanap/godot-agent-plugin.git"
+    "url": "git+https://github.com/cwchanap/godot-mcp.git"
   },
   "license": "MIT",
   "author": "cwchanap",
