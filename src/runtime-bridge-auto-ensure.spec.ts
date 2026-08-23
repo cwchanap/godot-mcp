@@ -263,11 +263,12 @@ describe('ToolHandlers runtime bridge auto-ensure', () => {
     const firstProcess = spawnMock.mock.results[0].value;
 
     const result = await handlers.handleRunProject({ projectPath, runtimeControl: true });
+    const responseText = result.content.map((item: { text: string }) => item.text).join('\n');
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Failed to prepare runtime bridge: EACCES: permission denied');
-    expect(result.content[0].text).toContain('Ensure the project directory and project.godot are writable');
-    expect(result.content[0].text).toContain('Use ensure_runtime_bridge');
+    expect(responseText).toContain('Failed to prepare runtime bridge: EACCES: permission denied');
+    expect(responseText).toContain('Ensure the project directory and project.godot are writable');
+    expect(responseText).toContain('Use ensure_runtime_bridge');
     expect(firstProcess.kill).not.toHaveBeenCalled();
     expect(runtimeManager.startSession).not.toHaveBeenCalled();
     expect(runtimeManager.stopSession).not.toHaveBeenCalled();
