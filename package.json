@@ -9,19 +9,19 @@
     "claude",
     "cline"
   ],
-  "homepage": "https://github.com/cwchanap/godot-mcp",
+  "homepage": "https://github.com/cwchanap/godot-agent-plugin",
   "bugs": {
-    "url": "https://github.com/cwchanap/godot-mcp/issues"
+    "url": "https://github.com/cwchanap/godot-agent-plugin/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/cwchanap/godot-mcp.git"
+    "url": "git+https://github.com/cwchanap/godot-agent-plugin.git"
   },
   "license": "MIT",
   "author": "cwchanap",
   "type": "module",
   "bin": {
-    "godot-plugin": "./build/index.js"
+    "godot-plugin": "build/index.js"
   },
   "publishConfig": {
     "access": "public"
@@ -35,6 +35,7 @@
     "test:watch": "vitest watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "prepare": "npm run build",
+    "smoke:packed": "node scripts/smoke-packed-cli.js build/index.js",
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build"
