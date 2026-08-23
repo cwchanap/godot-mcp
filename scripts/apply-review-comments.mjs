@@ -69,7 +69,7 @@ changed = (await replaceExact(
   'src/tool-handlers.runtime.spec.ts',
   `ensureBridge: vi.fn().mockResolvedValue({ installed: true, version: '1.0.0', compatible: true, action: 'unchanged' })`,
   `ensureBridge: vi.fn().mockResolvedValue({ version: '1.0.0', action: 'unchanged' })`,
-  2
+  4
 )) || changed;
 
 changed = (await replaceExact(
