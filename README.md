@@ -5,9 +5,9 @@
 [![](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white 'Node.js')](https://nodejs.org/en/download/)
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 
-[![](https://img.shields.io/github/last-commit/cwchanap/godot-mcp 'Last Commit')](https://github.com/cwchanap/godot-mcp/commits/main)
-[![](https://img.shields.io/github/stars/cwchanap/godot-mcp 'Stars')](https://github.com/cwchanap/godot-mcp/stargazers)
-[![](https://img.shields.io/github/forks/cwchanap/godot-mcp 'Forks')](https://github.com/cwchanap/godot-mcp/network/members)
+[![Last commit](https://img.shields.io/github/last-commit/cwchanap/godot-mcp 'Last Commit')](https://github.com/cwchanap/godot-mcp/commits/main)
+[![GitHub stars](https://img.shields.io/github/stars/cwchanap/godot-mcp 'Stars')](https://github.com/cwchanap/godot-mcp/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/cwchanap/godot-mcp 'Forks')](https://github.com/cwchanap/godot-mcp/network/members)
 [![](https://img.shields.io/npm/v/%40cwchanap%2Fgodot-plugin 'npm')](https://www.npmjs.com/package/@cwchanap/godot-plugin)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
@@ -85,7 +85,7 @@ Godot Agent Plugin packages the Godot MCP server for Codex and other MCP-compati
   - Save scenes with options for creating variants
 - **UID Management** (for Godot 4.4+):
   - Get UID for specific files
-  - Update UID references by resaving resources
+  - Update UID references by resaving project resources
 - **TileMap and TileSet Authoring**:
   - Create TileMap nodes and TileSet resources
   - Add atlas texture sources and assign TileSets
@@ -222,8 +222,11 @@ claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx -y @cwcha
 The repository root is an Agent Plugins 1.0 package. Cursor supports that format directly. Until the plugin is submitted to a Cursor marketplace, test a checkout locally by linking or copying it into Cursor's local plugin directory:
 
 ```bash
-ln -s /path/to/godot-mcp ~/.cursor/plugins/local/godot-plugin
+mkdir -p ~/.cursor/plugins/local
+ln -sfn /path/to/godot-mcp ~/.cursor/plugins/local/godot-plugin
 ```
+
+The repeated setup command safely replaces an existing `godot-plugin` symlink. If that path is a real file or directory, move or remove it explicitly instead of overwriting it automatically.
 
 Restart Cursor or run **Developer: Reload Window**. Once published in a Cursor marketplace, installation uses Cursor's normal **Customize > Plugins** flow.
 
@@ -333,7 +336,7 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["@cwchanap/godot-plugin"],
+      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"],
       "env": {
         "DEBUG": "true"
       },
@@ -390,13 +393,14 @@ For any MCP-compatible client, use this configuration:
       "command": "npx",
       "args": ["-y", "@cwchanap/godot-plugin@0.1.4"],
       "env": {
-        "GODOT_PATH": "/path/to/godot",
         "DEBUG": "true"
       }
     }
   }
 }
 ```
+
+Set `GODOT_PATH` only when automatic discovery cannot find Godot, and point it to a real Godot executable path.
 
 ### Distribution Model
 
