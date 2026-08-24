@@ -1,0 +1,58 @@
+name: Release npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  publish:
+    name: Publish to npm
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$RELEASE_TAG" != "v$PACKAGE_VERSION" ]; then
+            echo "::error::Release tag $RELEASE_TAG must match package version v$PACKAGE_VERSION."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm run test
+
+      - name: Build package
+        run: npm run build
+
+      - name: Smoke packed CLI
+        run: npm run smoke:packed
+
+      - name: Publish package
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
