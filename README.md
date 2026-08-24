@@ -85,7 +85,7 @@ Godot Agent Plugin packages the Godot MCP server for Codex and other MCP-compati
   - Save scenes with options for creating variants
 - **UID Management** (for Godot 4.4+):
   - Get UID for specific files
-  - Update UID references by resaving project resources
+  - Update UID references by resaving resources
 - **TileMap and TileSet Authoring**:
   - Create TileMap nodes and TileSet resources
   - Add atlas texture sources and assign TileSets
