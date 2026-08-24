@@ -27,9 +27,10 @@ describe('npm release workflow', () => {
     expect(releaseWorkflow).not.toContain('push:');
   });
 
-  it('validates the release tag against package.json before publishing', () => {
+  it('checks out and validates the release tag against package.json before publishing', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
+    expect(releaseWorkflow).toContain('ref: ${{ github.event.release.tag_name }}');
     expect(releaseWorkflow).toContain('RELEASE_TAG: ${{ github.event.release.tag_name }}');
     expect(releaseWorkflow).toContain('PACKAGE_VERSION=');
     expect(releaseWorkflow).toContain('"v$PACKAGE_VERSION"');
