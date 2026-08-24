@@ -1,4 +1,4 @@
-name: CI & Publish
+name: CI
 
 on:
   push:
@@ -7,15 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  release:
-    types:
-      - published
-  workflow_dispatch:
-    inputs:
-      trigger_publish:
-        description: Set to true to publish to npm
-        required: false
-        default: 'false'
 
 env:
   NODE_VERSION: '20'
@@ -65,32 +56,3 @@ jobs:
 
       - name: Run unit tests
         run: npm run test
-
-  publish:
-    name: Publish to npm
-    runs-on: ubuntu-latest
-    needs:
-      - build_and_lint
-      - unit_test
-    if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.trigger_publish == 'true') }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          registry-url: https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build package
-        run: npm run build
-
-      - name: Publish package
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
