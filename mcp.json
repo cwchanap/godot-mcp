@@ -4,7 +4,8 @@
     "godot": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"]
+      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"],
+      "cwd": "${PLUGIN_DATA}"
     }
   }
 }
