@@ -303,7 +303,7 @@ Then, inside Pi, install this repository as an Agent Plugin:
 /plugin trust godot-plugin
 ```
 
-The loader discovers the root `plugin.json` and `mcp.json` and projects the MCP server through `pi-mcp-adapter`.
+The loader discovers the root `plugin.json` and `mcp.json` and projects the MCP server through `pi-mcp-adapter`. The server entry pins `cwd` to `${PLUGIN_DATA}` so `npx` runs outside the repository checkout: `npm exec` matches the local `package.json` name and version and fails with `godot-plugin: command not found` when launched from the plugin root.
 
 #### MCP-only fallback
 
