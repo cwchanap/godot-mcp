@@ -53,5 +53,17 @@ describe('npm release workflow', () => {
     expect(releaseWorkflow).toContain('run: npm run smoke:packed');
     expect(releaseWorkflow).toContain('run: npm publish --access public');
     expect(releaseWorkflow).toContain('NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}');
+
+    const publishIndex = releaseWorkflow.indexOf('Publish package');
+    expect(publishIndex).toBeGreaterThan(-1);
+    for (const command of [
+      'run: npm ci',
+      'run: npm run typecheck',
+      'run: npm run test',
+      'run: npm run build',
+      'run: npm run smoke:packed',
+    ]) {
+      expect(releaseWorkflow.indexOf(command)).toBeLessThan(publishIndex);
+    }
   });
 });
