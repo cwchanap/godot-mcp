@@ -36,7 +36,7 @@ type RuntimeToolManager = RuntimeBridgeManager & {
 
 export const GODOT_SERVER_INFO = {
   name: 'godot-mcp',
-  version: '0.1.4',
+  version: '0.1.5',
 } as const;
 
 // Derive __filename and __dirname in ESM
