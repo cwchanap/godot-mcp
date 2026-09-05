@@ -38,6 +38,7 @@
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "prepare": "npm run build",
     "smoke:packed": "node scripts/smoke-packed-cli.js build/index.js",
+    "version:set": "node scripts/set-version.js",
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build"
