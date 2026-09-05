@@ -181,7 +181,7 @@ describe('Portable Agent Plugins identity', () => {
       description: 'Connect AI coding agents to local Godot projects through the Godot MCP server.',
       author: {
         name: 'cwchanap',
-        url: 'https://github.com/cwchanap'
+        url: 'https://github.com/cwchanap',
       },
       homepage: 'https://github.com/cwchanap/godot-mcp',
       repository: 'https://github.com/cwchanap/godot-mcp',
