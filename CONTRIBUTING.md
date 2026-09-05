@@ -42,6 +42,14 @@ By participating in this project, you agree to maintain a respectful and inclusi
 3. Build the project with `npm run build`
 4. For development with auto-rebuild, use `npm run watch`
 
+### Releasing
+
+1. Set the next version with `npm run version:set -- <major.minor.patch>`
+2. Commit and merge the version bump to `main`
+3. Create and publish the matching GitHub release tag, for example `v0.1.6`
+
+The release workflow rejects a tag whose version does not match `package.json`.
+
 ### Project Structure
 
 ```
