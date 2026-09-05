@@ -94,6 +94,12 @@ try {
     `$1${version}$2`,
   );
 
+  replaceOnce(
+    'src/tool-handlers.runtime.spec.ts',
+    /(expect\(client\.getServerVersion\(\)\)\.toEqual\(\{\r?\n        name: 'godot-mcp',\r?\n        version: ')[^']+(')/,
+    `$1${version}$2`,
+  );
+
   console.log(`Set release version to ${version}.`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
