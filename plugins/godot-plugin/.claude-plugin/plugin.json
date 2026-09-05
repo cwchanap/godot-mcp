@@ -1,7 +1,7 @@
 {
   "name": "godot-plugin",
   "displayName": "Godot Plugin",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Connect Claude Code to local Godot projects through the Godot MCP server.",
   "author": {
     "name": "cwchanap",
