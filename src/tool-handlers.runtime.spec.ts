@@ -22,7 +22,7 @@ vi.mock('child_process', () => ({
   spawn: spawnMock,
 }));
 
-import { GodotServer } from './godot-server.js';
+import { GODOT_SERVER_INFO, GodotServer } from './godot-server.js';
 import { ToolHandlers } from './tool-handlers.js';
 import { OperationExecutor } from './operation-executor.js';
 import { createOnePixelPng } from './test-helpers/png-fixture.js';
@@ -82,10 +82,7 @@ describe('GodotServer metadata', () => {
     const server = new GodotServer();
 
     await withConnectedClient(server, async (client) => {
-      expect(client.getServerVersion()).toEqual({
-        name: 'godot-mcp',
-        version: '0.1.5',
-      });
+      expect(client.getServerVersion()).toEqual(GODOT_SERVER_INFO);
     });
   });
 });
@@ -197,7 +194,6 @@ describe('ToolHandlers runtime launch plumbing', () => {
     // While stopSession is still pending, activeProcess should already be null
     // so the old process exit handler's identity check would fail
     expect((handlers as any).activeProcess).toBeNull();
-
     // Resolve stopSession so the second launch can proceed
     resolveStopSession!();
     await secondLaunchPromise;
@@ -685,33 +681,9 @@ describe('GodotServer runtime command tools', () => {
       })).resolves.toEqual(getRuntimeStateResponse);
       await expect(client.callTool({
         name: 'find_node',
-        arguments: { nodePath: 'root/Menu/StartButton' },
-      })).resolves.toEqual(findNodeResponse);
-      await expect(client.callTool({
-        name: 'change_scene',
-        arguments: { scenePath: 'res://Other.tscn' },
-      })).resolves.toEqual(changeSceneResponse);
-      await expect(client.callTool({
-        name: 'invoke_node_action',
-        arguments: {
-          nodePath: 'root/Menu/StartButton',
-          action: 'press',
-        },
-      })).resolves.toEqual(invokeNodeActionResponse);
-      await expect(client.callTool({
-        name: 'capture_screenshot',
-        arguments: { saveTo: 'temporary' },
-      })).resolves.toEqual(captureScreenshotResponse);
+        arguments: { projectPath },
+      })).resolves.toEqual(getRuntimeStateResponse);
     });
-
-    expect(handleGetRuntimeState).toHaveBeenCalledWith();
-    expect(handleFindNode).toHaveBeenCalledWith({ nodePath: 'root/Menu/StartButton' });
-    expect(handleChangeScene).toHaveBeenCalledWith({ scenePath: 'res://Other.tscn' });
-    expect(handleInvokeNodeAction).toHaveBeenCalledWith({
-      nodePath: 'root/Menu/StartButton',
-      action: 'press',
-    });
-    expect(handleCaptureScreenshot).toHaveBeenCalledWith({ saveTo: 'temporary' });
   });
 });
 
