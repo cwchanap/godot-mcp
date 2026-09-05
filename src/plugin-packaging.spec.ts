@@ -198,10 +198,7 @@ describe('Portable Agent Plugins identity', () => {
           type: 'stdio',
           command: 'npx',
           args: ['-y', `@cwchanap/godot-plugin@${GODOT_SERVER_INFO.version}`],
-          // Launch from plugin data, not PLUGIN_ROOT: npm exec resolves the
-          // spec against the nearest package.json, and the repo root declares
-          // this exact name@version, which shadows the published bin with an
-          // unlinked local one (`sh: godot-plugin: command not found`).
+          // cwd avoids npx self-shadowing: repo package.json matches this name@version.
           cwd: '${PLUGIN_DATA}',
         },
       },
