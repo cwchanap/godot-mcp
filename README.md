@@ -163,7 +163,7 @@ The server currently exposes 32 MCP tools.
 Godot Agent Plugin uses one agent-neutral stdio MCP server for every supported client:
 
 ```text
-npx -y @cwchanap/godot-plugin@0.1.4
+npx -y @cwchanap/godot-plugin@latest
 ```
 
 The repository also ships Agent Plugins 1.0 metadata (`plugin.json` and `mcp.json`) and native wrapper metadata where a client has its own plugin format. Set `GODOT_PATH` in the agent's environment when automatic Godot discovery cannot find the executable.
@@ -208,13 +208,13 @@ The Claude plugin reuses `plugins/godot-plugin/.mcp.json`; there is no Claude-sp
 For direct MCP configuration instead of the plugin wrapper:
 
 ```bash
-claude mcp add --transport stdio godot -- npx -y @cwchanap/godot-plugin@0.1.4
+claude mcp add --transport stdio godot -- npx -y @cwchanap/godot-plugin@latest
 ```
 
 With environment variables:
 
 ```bash
-claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx -y @cwchanap/godot-plugin@0.1.4
+claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx -y @cwchanap/godot-plugin@latest
 ```
 
 ### Cursor
@@ -238,7 +238,7 @@ For MCP-only setup, create `.cursor/mcp.json` in a project or `~/.cursor/mcp.jso
     "godot": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"]
+      "args": ["-y", "@cwchanap/godot-plugin@latest"]
     }
   }
 }
@@ -251,7 +251,7 @@ Create a custom MCP connection in Devin using:
 ```text
 Transport: STDIO
 Command: npx
-Arguments: -y @cwchanap/godot-plugin@0.1.4
+Arguments: -y @cwchanap/godot-plugin@latest
 ```
 
 Add `GODOT_PATH` as an environment variable when needed.
@@ -268,7 +268,7 @@ For the current stable OpenCode configuration, add a local MCP server to `openco
   "mcp": {
     "godot": {
       "type": "local",
-      "command": ["npx", "-y", "@cwchanap/godot-plugin@0.1.4"],
+      "command": ["npx", "-y", "@cwchanap/godot-plugin@latest"],
       "enabled": true
     }
   }
@@ -318,7 +318,7 @@ Then create a project `.mcp.json`:
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"]
+      "args": ["-y", "@cwchanap/godot-plugin@latest"]
     }
   }
 }
@@ -336,7 +336,7 @@ Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/gl
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"],
+      "args": ["-y", "@cwchanap/godot-plugin@latest"],
       "env": {
         "DEBUG": "true"
       },
@@ -391,7 +391,7 @@ For any MCP-compatible client, use this configuration:
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["-y", "@cwchanap/godot-plugin@0.1.4"],
+      "args": ["-y", "@cwchanap/godot-plugin@latest"],
       "env": {
         "DEBUG": "true"
       }
