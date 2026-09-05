@@ -16,6 +16,7 @@ const releaseFiles = [
   'plugins/godot-plugin/.claude-plugin/plugin.json',
   'plugins/godot-plugin/.mcp.json',
   'src/godot-server.ts',
+  'src/tool-handlers.runtime.spec.ts',
 ];
 
 type JsonObject = Record<string, any>;
@@ -57,6 +58,10 @@ describe('release version setter', () => {
       );
       const wrapperMcp = readJson(fixtureRoot, 'plugins/godot-plugin/.mcp.json');
       const serverSource = readFileSync(resolve(fixtureRoot, 'src/godot-server.ts'), 'utf8');
+      const runtimeTestSource = readFileSync(
+        resolve(fixtureRoot, 'src/tool-handlers.runtime.spec.ts'),
+        'utf8',
+      );
 
       expect(packageManifest.version).toBe('9.8.7');
       expect(packageLock.version).toBe('9.8.7');
@@ -71,6 +76,7 @@ describe('release version setter', () => {
         '@cwchanap/godot-plugin@9.8.7',
       );
       expect(serverSource).toContain("version: '9.8.7'");
+      expect(runtimeTestSource).toContain("version: '9.8.7'");
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
