@@ -87,4 +87,49 @@ describe('release version setter', () => {
 
     expect(packageManifest.scripts['version:set']).toBe('node scripts/set-version.js');
   });
+
+  it('rejects versions with leading-zero numeric components', () => {
+    for (const invalid of ['01.2.3', '1.02.3', '1.2.03', '0.0.00']) {
+      const result = spawnSync(process.execPath, [versionSetterPath, invalid], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      });
+
+      expect(result.status, `expected ${invalid} to be rejected`).not.toBe(0);
+      expect(result.stderr).toContain('Usage');
+    }
+  });
+
+  it('is idempotent: rerunning with the current version is a no-op', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'godot-mcp-version-'));
+
+    try {
+      for (const path of releaseFiles) {
+        const source = resolve(repoRoot, path);
+        const destination = resolve(fixtureRoot, path);
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(source, destination);
+      }
+
+      const first = spawnSync(process.execPath, [versionSetterPath, '2.0.0'], {
+        cwd: fixtureRoot,
+        encoding: 'utf8',
+      });
+      expect(first.status, first.stderr).toBe(0);
+
+      const packageManifestPath = resolve(fixtureRoot, 'package.json');
+      const afterFirst = readFileSync(packageManifestPath, 'utf8');
+
+      const second = spawnSync(process.execPath, [versionSetterPath, '2.0.0'], {
+        cwd: fixtureRoot,
+        encoding: 'utf8',
+      });
+      expect(second.status, second.stderr).toBe(0);
+
+      const afterSecond = readFileSync(packageManifestPath, 'utf8');
+      expect(afterSecond).toBe(afterFirst);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
 });

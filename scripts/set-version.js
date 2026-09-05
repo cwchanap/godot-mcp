@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 const version = process.argv[2];
 
-if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+if (!version || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
   console.error('Usage: npm run version:set -- <major.minor.patch>');
   process.exit(1);
 }
@@ -17,10 +17,15 @@ function filePath(relativePath) {
 function replaceOnce(relativePath, pattern, replacement) {
   const path = filePath(relativePath);
   const content = readFileSync(path, 'utf8');
+
+  if (!pattern.test(content)) {
+    throw new Error(`Could not find version pattern in ${relativePath}`);
+  }
+
   const next = content.replace(pattern, replacement);
 
   if (next === content) {
-    throw new Error(`Could not update version in ${relativePath}`);
+    return;
   }
 
   writeFileSync(path, next);
@@ -62,7 +67,9 @@ function setPackageLockVersion() {
     throw new Error(`Could not update root package versions in ${relativePath}`);
   }
 
-  writeFileSync(path, next);
+  if (next !== content) {
+    writeFileSync(path, next);
+  }
 }
 
 try {
