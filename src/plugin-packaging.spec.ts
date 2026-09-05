@@ -137,7 +137,7 @@ describe('Godot plugin package identity', () => {
   it('publishes the cwchanap package without changing the MCP protocol identity', () => {
     expect(packageManifest).toMatchObject({
       name: '@cwchanap/godot-plugin',
-      version: '0.1.4',
+      version: '0.1.5',
       description: 'MCP server for interfacing with Godot game engine. Provides tools for launching the editor, running projects, and capturing debug output.',
       keywords: ['godot', 'mcp', 'ai', 'claude', 'cline'],
       author: 'cwchanap',
@@ -181,7 +181,7 @@ describe('Portable Agent Plugins identity', () => {
       description: 'Connect AI coding agents to local Godot projects through the Godot MCP server.',
       author: {
         name: 'cwchanap',
-        url: 'https://github.com/cwchanap',
+        url: 'https://github.com/cwchanap'
       },
       homepage: 'https://github.com/cwchanap/godot-mcp',
       repository: 'https://github.com/cwchanap/godot-mcp',
