@@ -32,7 +32,7 @@ describe('npm release workflow', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
     expect(releaseWorkflow).toContain("RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}");
-    expect(releaseWorkflow).toContain('ref: ${{ env.RELEASE_TAG }}');
+    expect(releaseWorkflow).toContain('ref: refs/tags/${{ env.RELEASE_TAG }}');
     expect(releaseWorkflow).toContain('PACKAGE_VERSION=');
     expect(releaseWorkflow).toContain('"v$PACKAGE_VERSION"');
     expect(releaseWorkflow.indexOf('Validate release version')).toBeGreaterThan(-1);
