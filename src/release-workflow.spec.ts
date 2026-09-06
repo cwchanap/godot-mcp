@@ -14,7 +14,7 @@ function readReleaseWorkflow(): string {
 }
 
 describe('npm release workflow', () => {
-  it('publishes only from stable published GitHub releases', () => {
+  it('publishes from stable GitHub releases and allows explicit retry of an existing tag', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
     expect(existsSync(releaseWorkflowPath)).toBe(true);
@@ -22,16 +22,17 @@ describe('npm release workflow', () => {
     expect(ciWorkflow).not.toContain('npm publish');
     expect(releaseWorkflow).toContain('release:');
     expect(releaseWorkflow).toContain('types: [published]');
-    expect(releaseWorkflow).toContain('if: ${{ !github.event.release.prerelease }}');
-    expect(releaseWorkflow).not.toContain('workflow_dispatch:');
+    expect(releaseWorkflow).toContain('workflow_dispatch:');
+    expect(releaseWorkflow).toContain('tag:');
+    expect(releaseWorkflow).toContain('required: true');
     expect(releaseWorkflow).not.toContain('push:');
   });
 
-  it('checks out and validates the release tag against package.json before publishing', () => {
+  it('checks out and validates the selected release tag against package.json before publishing', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
-    expect(releaseWorkflow).toContain('ref: ${{ github.event.release.tag_name }}');
-    expect(releaseWorkflow).toContain('RELEASE_TAG: ${{ github.event.release.tag_name }}');
+    expect(releaseWorkflow).toContain("RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}");
+    expect(releaseWorkflow).toContain('ref: ${{ env.RELEASE_TAG }}');
     expect(releaseWorkflow).toContain('PACKAGE_VERSION=');
     expect(releaseWorkflow).toContain('"v$PACKAGE_VERSION"');
     expect(releaseWorkflow.indexOf('Validate release version')).toBeGreaterThan(-1);
@@ -40,19 +41,23 @@ describe('npm release workflow', () => {
     );
   });
 
-  it('runs the full package verification and preserves npm token publishing', () => {
+  it('runs the full package verification and publishes through npm trusted publishing', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
     expect(releaseWorkflow).toContain("NODE_VERSION: '24'");
     expect(releaseWorkflow).toContain('contents: read');
     expect(releaseWorkflow).toContain('id-token: write');
+    expect(releaseWorkflow).toContain('uses: actions/checkout@v7');
+    expect(releaseWorkflow).toContain('uses: actions/setup-node@v7');
+    expect(releaseWorkflow).toContain('package-manager-cache: false');
     expect(releaseWorkflow).toContain('run: npm ci');
     expect(releaseWorkflow).toContain('run: npm run typecheck');
     expect(releaseWorkflow).toContain('run: npm run test');
     expect(releaseWorkflow).toContain('run: npm run build');
     expect(releaseWorkflow).toContain('run: npm run smoke:packed');
     expect(releaseWorkflow).toContain('run: npm publish --access public');
-    expect(releaseWorkflow).toContain('NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}');
+    expect(releaseWorkflow).not.toContain('NODE_AUTH_TOKEN');
+    expect(releaseWorkflow).not.toContain('NPM_TOKEN');
 
     const publishIndex = releaseWorkflow.indexOf('Publish package');
     expect(publishIndex).toBeGreaterThan(-1);
