@@ -70,7 +70,7 @@ describe('release version setter', () => {
       expect(codexPlugin.version).toBe('9.8.7');
       expect(claudePlugin.version).toBe('9.8.7');
       expect(portableMcp.mcpServers.godot.args).toContain(
-        '@cwchanap/godot-plugin@9.8.7',
+        '@cwchanap/godot-plugin@latest',
       );
       expect(wrapperMcp.mcpServers.godot.args).toContain(
         '@cwchanap/godot-plugin@9.8.7',
