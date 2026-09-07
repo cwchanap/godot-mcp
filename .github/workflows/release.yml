@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing stable release tag to publish
+        description: Existing stable release tag to stage
         required: true
         type: string
 
@@ -20,7 +20,7 @@ env:
 
 jobs:
   publish:
-    name: Publish to npm
+    name: Stage npm package
     if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     steps:
@@ -60,5 +60,5 @@ jobs:
       - name: Smoke packed CLI
         run: npm run smoke:packed
 
-      - name: Publish package
-        run: npm publish --access public
+      - name: Stage package
+        run: npm stage publish --access public
