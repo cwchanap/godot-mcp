@@ -84,16 +84,11 @@ try {
 
   setPackageLockVersion();
 
-  for (const relativePath of [
-    'mcp.json',
+  replaceOnce(
     'plugins/godot-plugin/.mcp.json',
-  ]) {
-    replaceOnce(
-      relativePath,
-      /@cwchanap\/godot-plugin@[^"\]]+/,
-      `@cwchanap/godot-plugin@${version}`,
-    );
-  }
+    /@cwchanap\/godot-plugin@[^"\]]+/,
+    `@cwchanap/godot-plugin@${version}`,
+  );
 
   replaceOnce(
     'src/godot-server.ts',
