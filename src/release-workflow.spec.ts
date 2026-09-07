@@ -22,6 +22,7 @@ describe('npm release workflow', () => {
     expect(ciWorkflow).not.toContain('npm publish');
     expect(releaseWorkflow).toContain('release:');
     expect(releaseWorkflow).toContain('types: [published]');
+    expect(releaseWorkflow).toContain('!github.event.release.prerelease');
     expect(releaseWorkflow).toContain('workflow_dispatch:');
     expect(releaseWorkflow).toContain('tag:');
     expect(releaseWorkflow).toContain('required: true');
