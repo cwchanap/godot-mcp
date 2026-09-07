@@ -29,7 +29,7 @@ describe('npm release workflow', () => {
     expect(releaseWorkflow).not.toContain('push:');
   });
 
-  it('checks out and validates the selected release tag against package.json before publishing', () => {
+  it('checks out and validates the selected release tag against package.json before staging', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
     expect(releaseWorkflow).toContain("RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}");
@@ -37,12 +37,12 @@ describe('npm release workflow', () => {
     expect(releaseWorkflow).toContain('PACKAGE_VERSION=');
     expect(releaseWorkflow).toContain('"v$PACKAGE_VERSION"');
     expect(releaseWorkflow.indexOf('Validate release version')).toBeGreaterThan(-1);
-    expect(releaseWorkflow.indexOf('Publish package')).toBeGreaterThan(
+    expect(releaseWorkflow.indexOf('Stage package')).toBeGreaterThan(
       releaseWorkflow.indexOf('Validate release version')
     );
   });
 
-  it('runs the full package verification and publishes through npm trusted publishing', () => {
+  it('runs the full package verification and stages through npm trusted publishing', () => {
     const releaseWorkflow = readReleaseWorkflow();
 
     expect(releaseWorkflow).toContain("NODE_VERSION: '24'");
@@ -56,12 +56,13 @@ describe('npm release workflow', () => {
     expect(releaseWorkflow).toContain('run: npm run test');
     expect(releaseWorkflow).toContain('run: npm run build');
     expect(releaseWorkflow).toContain('run: npm run smoke:packed');
-    expect(releaseWorkflow).toContain('run: npm publish --access public');
+    expect(releaseWorkflow).toContain('run: npm stage publish --access public');
+    expect(releaseWorkflow).not.toContain('run: npm publish');
     expect(releaseWorkflow).not.toContain('NODE_AUTH_TOKEN');
     expect(releaseWorkflow).not.toContain('NPM_TOKEN');
 
-    const publishIndex = releaseWorkflow.indexOf('Publish package');
-    expect(publishIndex).toBeGreaterThan(-1);
+    const stageIndex = releaseWorkflow.indexOf('Stage package');
+    expect(stageIndex).toBeGreaterThan(-1);
     for (const command of [
       'run: npm ci',
       'run: npm run typecheck',
@@ -69,7 +70,7 @@ describe('npm release workflow', () => {
       'run: npm run build',
       'run: npm run smoke:packed',
     ]) {
-      expect(releaseWorkflow.indexOf(command)).toBeLessThan(publishIndex);
+      expect(releaseWorkflow.indexOf(command)).toBeLessThan(stageIndex);
     }
   });
 });
