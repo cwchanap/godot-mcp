@@ -189,22 +189,23 @@ describe('Portable Agent Plugins identity', () => {
     });
   });
 
-  it('pins the same stdio launcher as the native plugin wrapper', () => {
+  it('tracks npm latest independently of the version-pinned native wrapper', () => {
     expect(portableMcpManifest).toEqual({
       $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
       mcpServers: {
         godot: {
           type: 'stdio',
           command: 'npx',
-          args: ['-y', `@cwchanap/godot-plugin@${GODOT_SERVER_INFO.version}`],
+          args: ['-y', '@cwchanap/godot-plugin@latest'],
           // cwd avoids npx self-shadowing: repo package.json matches this name@version.
           cwd: '${PLUGIN_DATA}',
         },
       },
     });
-    expect(portableMcpManifest.mcpServers.godot).toMatchObject(
-      mcpManifest.mcpServers.godot,
-    );
+    expect(mcpManifest.mcpServers.godot.args).toEqual([
+      '-y',
+      `@cwchanap/godot-plugin@${GODOT_SERVER_INFO.version}`,
+    ]);
   });
 });
 
