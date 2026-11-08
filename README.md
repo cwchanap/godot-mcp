@@ -173,6 +173,7 @@ The repository also ships Agent Plugins 1.0 metadata (`plugin.json` and `mcp.jso
 | Codex | Native plugin marketplace + MCP | First-party |
 | Claude Code | Native plugin marketplace + MCP | First-party |
 | Cursor | Agent Plugins 1.0 + native MCP fallback | First-party metadata |
+| Antigravity (agy) | Agent Plugins 1.0 + native MCP fallback | First-party metadata |
 | Devin | Custom stdio MCP | First-party configuration |
 | OpenCode | Local stdio MCP | First-party configuration |
 | Pi | Agent Plugins 1.0 or MCP through community extensions | Community-supported |
@@ -244,6 +245,37 @@ For MCP-only setup, create `.cursor/mcp.json` in a project or `~/.cursor/mcp.jso
 }
 ```
 
+### Antigravity (agy)
+
+Install the repository directly from GitHub as an Agent Plugin:
+
+```bash
+agy plugin install https://github.com/cwchanap/godot-mcp.git
+```
+
+`agy plugin install` needs a directory or a git URL; the `owner/repo` shorthand is not supported. To install from a local checkout instead, pass its path:
+
+```bash
+agy plugin install /path/to/godot-mcp
+```
+
+Check the result with `agy plugin list` and `agy plugin validate ~/.gemini/config/plugins/godot-plugin`. Manage the plugin with `agy plugin disable godot-plugin`, `agy plugin enable godot-plugin`, and `agy plugin uninstall godot-plugin`.
+
+The root `plugin.json` and `mcp.json` use the Agent Plugins 1.0 format, which agy loads only while its `enable-agent-plugins-spec` flag is on. Without the flag, use the MCP-only setup below.
+
+For MCP-only setup, add the server to `~/.gemini/config/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "godot": {
+      "command": "npx",
+      "args": ["-y", "@cwchanap/godot-plugin@latest"]
+    }
+  }
+}
+```
+
 ### Devin
 
 Create a custom MCP connection in Devin using:
@@ -260,28 +292,30 @@ A hosted Devin session starts the stdio server in Devin's execution environment.
 
 ### OpenCode
 
-For the current stable OpenCode configuration, add a local MCP server to `opencode.json` or `opencode.jsonc`:
+OpenCode uses this package as an MCP server, not as a native OpenCode plugin. Install it globally with:
+
+```bash
+opencode mcp add godot --global -- npx -y @cwchanap/godot-plugin@latest
+opencode mcp list
+```
+
+Omit `--global` to configure only the current project. If Godot is not detected automatically, add `--env GODOT_PATH=/path/to/godot` before `--`.
+
+Alternatively, add the server to `opencode.json` or `opencode.jsonc`:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "godot": {
-      "type": "local",
-      "command": ["npx", "-y", "@cwchanap/godot-plugin@latest"],
-      "enabled": true
+    "servers": {
+      "godot": {
+        "type": "local",
+        "command": ["npx", "-y", "@cwchanap/godot-plugin@latest"]
+      }
     }
   }
 }
 ```
-
-Verify the connection with:
-
-```bash
-opencode mcp list
-```
-
-OpenCode V2 currently uses `mcp.servers` and `disabled` instead of the stable `mcp.<name>` and `enabled` shape. Use its V2 documentation only when intentionally running that version.
 
 ### Pi
 
